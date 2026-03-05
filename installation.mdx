@@ -1,0 +1,590 @@
+---
+title: Installation Guide
+description: Complete installation instructions for Karma POS including prerequisites, dependencies, and configuration
+---
+
+# Installation Guide
+
+This comprehensive guide covers everything you need to install, configure, and deploy Karma POS for both development and production environments.
+
+## System Requirements
+
+### Required Software
+
+Before installing Karma POS, ensure your system meets these requirements:
+
+| Software | Version | Purpose |
+|----------|---------|----------|
+| Node.js | 24.x or higher | JavaScript runtime |
+| npm | 10.x or higher | Package manager |
+| Angular CLI | 19.0.6+ | Build tooling |
+| Git | Latest | Version control |
+
+<Note>
+Karma POS is tested with Node.js v24.13.1 and Angular CLI 19.0.6. Using older versions may cause compatibility issues.
+</Note>
+
+### Recommended Environment
+
+- **Operating System**: Linux, macOS, or Windows 10/11
+- **RAM**: 4GB minimum, 8GB recommended
+- **Disk Space**: 500MB for application + 1GB for dependencies
+- **Browser**: Chrome 90+, Firefox 88+, Safari 14+, or Edge 90+
+
+## Installation Steps
+
+### Step 1: Install Node.js
+
+If you don't have Node.js installed:
+
+<CodeGroup>
+
+```bash Linux (using nvm)
+# Install nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+
+# Install Node.js 24
+nvm install 24
+nvm use 24
+
+# Verify installation
+node --version  # Should show v24.x.x
+npm --version   # Should show 10.x.x
+```
+
+```bash macOS (using Homebrew)
+# Install Homebrew if needed
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install Node.js
+brew install node@24
+
+# Verify installation
+node --version
+npm --version
+```
+
+```bash Windows
+# Download the installer from https://nodejs.org/
+# Run the installer and follow the prompts
+# Open a new terminal and verify:
+node --version
+npm --version
+```
+
+</CodeGroup>
+
+### Step 2: Install Angular CLI
+
+Install the Angular CLI globally:
+
+```bash
+npm install -g @angular/cli@19
+```
+
+Verify the installation:
+
+```bash
+ng version
+```
+
+You should see Angular CLI version 19.0.6 or higher.
+
+### Step 3: Clone or Extract the Project
+
+If using Git:
+
+```bash
+git clone <repository-url>
+cd sakai-ng
+```
+
+Or extract the project archive to your desired location.
+
+### Step 4: Install Project Dependencies
+
+Navigate to the project root and install all dependencies:
+
+```bash
+npm install
+```
+
+This will install all packages defined in `package.json`, including:
+
+#### Core Dependencies
+
+```json
+{
+  "@angular/animations": "^19.0.0",
+  "@angular/common": "^19.0.0",
+  "@angular/compiler": "^19.0.0",
+  "@angular/core": "^19.0.0",
+  "@angular/forms": "^19.0.0",
+  "@angular/platform-browser": "^19.0.0",
+  "@angular/router": "^19.0.0"
+}
+```
+
+#### UI & Theming
+
+```json
+{
+  "primeng": "^19.0.8",
+  "@primeng/themes": "^19.0.5",
+  "primeicons": "^7.0.0",
+  "tailwindcss": "^3.4.17",
+  "tailwindcss-primeui": "^0.5.1"
+}
+```
+
+#### Utilities & Integrations
+
+```json
+{
+  "@microsoft/signalr": "^10.0.0",
+  "chart.js": "4.4.2",
+  "rxjs": "~7.8.0",
+  "jspdf": "^3.0.3",
+  "pdfmake": "^0.2.20",
+  "xlsx": "^0.18.5",
+  "html2canvas": "^1.4.1",
+  "crypto-js": "^4.2.0",
+  "uuid": "^13.0.0",
+  "ngx-cookie-service": "^21.1.0"
+}
+```
+
+<Info>
+The installation process may take 2-5 minutes depending on your internet connection.
+</Info>
+
+## Configuration
+
+### Application Configuration
+
+The main application configuration is in `src/app.config.ts`:
+
+```typescript
+import { ApplicationConfig, LOCALE_ID } from '@angular/core';
+import { provideRouter } from '@angular/router';
+import { provideHttpClient, withFetch } from '@angular/common/http';
+import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
+import { providePrimeNG } from 'primeng/config';
+import Aura from '@primeng/themes/aura';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideRouter(appRoutes),
+    provideHttpClient(withFetch()),
+    provideAnimationsAsync(),
+    providePrimeNG({
+      theme: { 
+        preset: Aura, 
+        options: { darkModeSelector: '.app-dark' } 
+      }
+    }),
+    { provide: LOCALE_ID, useValue: 'es-CO' }
+  ]
+};
+```
+
+### API Configuration
+
+Configure the backend API URL in `src/app/components/services/pos.service.ts`:
+
+```typescript
+private apiUrl = 'https://localhost:7197/api/';
+```
+
+<Warning>
+Update this URL to point to your actual backend API server before deploying to production.
+</Warning>
+
+### Angular Configuration
+
+The Angular CLI configuration is in `angular.json`:
+
+```json
+{
+  "projects": {
+    "sakai-ng": {
+      "projectType": "application",
+      "sourceRoot": "src",
+      "architect": {
+        "build": {
+          "options": {
+            "outputPath": "dist/sakai-ng",
+            "index": "src/index.html",
+            "browser": "src/main.ts",
+            "styles": ["src/styles.scss"],
+            "assets": ["src/assets"]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### TypeScript Configuration
+
+The TypeScript compiler settings in `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "strict": true,
+    "experimentalDecorators": true,
+    "moduleResolution": "bundler",
+    "esModuleInterop": true
+  }
+}
+```
+
+### TailwindCSS Configuration
+
+Tailwind is configured in `tailwind.config.js` with PrimeUI integration:
+
+```javascript
+import PrimeUI from 'tailwindcss-primeui';
+
+export default {
+  darkMode: ['selector', '[class="app-dark"]'],
+  content: ['./src/**/*.{html,ts,scss,css}', './index.html'],
+  plugins: [PrimeUI],
+  theme: {
+    extend: {
+      // Custom color scheme and styles
+    }
+  }
+};
+```
+
+## Running the Application
+
+### Development Server
+
+Start the development server:
+
+```bash
+npm start
+```
+
+Or using Angular CLI:
+
+```bash
+ng serve
+```
+
+The application will be available at `http://localhost:4200/`.
+
+**Development server features:**
+- Hot module replacement (HMR)
+- Automatic recompilation on file changes
+- Source maps for debugging
+- Error overlay in browser
+
+<Tip>
+Use `ng serve --open` to automatically open the browser when the server starts.
+</Tip>
+
+### Watch Mode
+
+For continuous building without serving:
+
+```bash
+npm run watch
+```
+
+This builds the project in development mode and watches for file changes.
+
+## Building for Production
+
+### Production Build
+
+Create an optimized production build:
+
+```bash
+npm run build
+```
+
+Or:
+
+```bash
+ng build
+```
+
+This creates optimized bundles in the `dist/sakai-ng/` directory.
+
+**Production build optimizations:**
+- Code minification and uglification
+- Tree shaking to remove unused code
+- Ahead-of-Time (AOT) compilation
+- CSS optimization and purging
+- Asset hashing for cache busting
+
+### Build Configurations
+
+The project includes two build configurations:
+
+<CodeGroup>
+
+```bash Production (default)
+ng build --configuration production
+
+# Features:
+# - Optimized bundle size
+# - No source maps
+# - AOT compilation
+# - Output hashing
+```
+
+```bash Development
+ng build --configuration development
+
+# Features:
+# - Faster builds
+# - Source maps enabled
+# - No optimization
+# - Better debugging
+```
+
+</CodeGroup>
+
+### Build Budgets
+
+The production build enforces size budgets:
+
+```json
+"budgets": [
+  {
+    "type": "initial",
+    "maximumWarning": "1mb",
+    "maximumError": "5mb"
+  },
+  {
+    "type": "anyComponentStyle",
+    "maximumWarning": "2kb",
+    "maximumError": "4kb"
+  }
+]
+```
+
+<Warning>
+If your bundle exceeds these limits, the build will fail. Consider code splitting or lazy loading modules.
+</Warning>
+
+## Deployment
+
+### Deploy to Vercel
+
+Karma POS includes Vercel configuration in `vercel.json`:
+
+```bash
+# Install Vercel CLI
+npm install -g vercel
+
+# Deploy
+vercel
+```
+
+### Deploy to Other Platforms
+
+After building for production, deploy the `dist/sakai-ng/` directory to:
+
+- **Nginx**: Point document root to `dist/sakai-ng/browser/`
+- **Apache**: Configure virtual host to serve from `dist/sakai-ng/browser/`
+- **AWS S3**: Upload contents to S3 bucket with static website hosting
+- **Firebase Hosting**: Use `firebase deploy`
+- **Netlify**: Drag and drop the `dist` folder or connect via Git
+
+### Server Configuration
+
+For Single Page Applications (SPAs), configure your server to redirect all routes to `index.html`:
+
+<CodeGroup>
+
+```nginx Nginx
+location / {
+  try_files $uri $uri/ /index.html;
+}
+```
+
+```apache Apache
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
+```
+
+</CodeGroup>
+
+## Testing
+
+### Unit Tests
+
+Run unit tests with Karma:
+
+```bash
+npm test
+```
+
+Or:
+
+```bash
+ng test
+```
+
+This launches the Karma test runner in watch mode.
+
+### Test Configuration
+
+Tests are configured in `angular.json`:
+
+```json
+"test": {
+  "builder": "@angular-devkit/build-angular:karma",
+  "options": {
+    "polyfills": ["zone.js", "zone.js/testing"],
+    "tsConfig": "tsconfig.spec.json",
+    "styles": ["src/styles.scss"]
+  }
+}
+```
+
+## Code Quality
+
+### Formatting
+
+Format code with Prettier:
+
+```bash
+npm run format
+```
+
+This formats all `.ts`, `.js`, `.mjs`, `.mts`, `.d.ts`, and `.html` files.
+
+### Prettier Configuration
+
+Settings are in `.prettierrc.json`:
+
+```json
+{
+  "tabWidth": 4,
+  "printWidth": 200,
+  "singleQuote": true,
+  "trailingComma": "none",
+  "bracketSpacing": true
+}
+```
+
+### ESLint
+
+The project includes ESLint configuration with:
+- `eslint-config-prettier`: Disables conflicting rules
+- `eslint-plugin-import`: Import/export validation
+- `eslint-plugin-prettier`: Prettier integration
+
+## Project Structure
+
+Understanding the project structure:
+
+```
+sakai-ng/
+├── src/
+│   ├── app/
+│   │   ├── components/
+│   │   │   ├── pages/              # Feature modules
+│   │   │   │   ├── pos-folder/     # POS module
+│   │   │   │   ├── inventory/      # Inventory management
+│   │   │   │   ├── purchases/      # Purchase orders
+│   │   │   │   ├── reports/        # Analytics
+│   │   │   │   ├── cash-register/  # Cash management
+│   │   │   │   ├── financing/      # Payment plans
+│   │   │   │   ├── promotions/     # Promotions
+│   │   │   │   ├── quotes/         # Quotes
+│   │   │   │   └── master/         # Master data
+│   │   │   └── services/           # Shared services
+│   │   ├── layout/                 # App layout components
+│   │   └── auth/                   # Authentication
+│   ├── assets/                     # Static assets
+│   │   ├── layout/                 # Layout styles & images
+│   │   └── demo/                   # Demo content
+│   ├── styles.scss                 # Global styles
+│   ├── main.ts                     # Application entry point
+│   └── index.html                  # HTML template
+├── angular.json                    # Angular CLI config
+├── package.json                    # Dependencies
+├── tsconfig.json                   # TypeScript config
+├── tailwind.config.js              # Tailwind config
+└── vercel.json                     # Vercel deployment
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### Port Already in Use
+
+```bash
+# Error: Port 4200 is already in use
+# Solution: Use a different port
+ng serve --port 4201
+```
+
+#### Node Version Mismatch
+
+```bash
+# Error: The engine "node" is incompatible
+# Solution: Use nvm to switch versions
+nvm use 24
+```
+
+#### Package Installation Errors
+
+```bash
+# Clear npm cache and reinstall
+rm -rf node_modules package-lock.json
+npm cache clean --force
+npm install
+```
+
+#### Build Memory Errors
+
+```bash
+# Increase Node.js memory limit
+node --max-old-space-size=4096 node_modules/@angular/cli/bin/ng build
+```
+
+### Getting Help
+
+If you encounter issues:
+
+1. Check the browser console for errors (F12)
+2. Review the terminal output for build errors
+3. Verify all dependencies are installed: `npm list`
+4. Ensure Node.js version: `node --version`
+5. Check the Network tab for API errors
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Learn how to use Karma POS with a quick tutorial
+  </Card>
+  <Card title="Introduction" icon="book" href="/introduction">
+    Understand the features and architecture
+  </Card>
+</CardGroup>
+
+---
+
+<Info>
+For advanced configuration options, refer to the [Angular CLI documentation](https://angular.dev/tools/cli) and [PrimeNG documentation](https://primeng.org/).
+</Info>

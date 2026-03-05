@@ -1,0 +1,682 @@
+---
+title: 'State Management'
+description: 'Documentation for state management patterns using Angular Signals, RxJS, and services'
+---
+
+## State Management Overview
+
+The application uses a **hybrid approach** combining:
+
+1. **Angular Signals** (new in Angular 16+) for reactive UI state
+2. **RxJS Observables** for async operations and events
+3. **Service-based state** for shared application state
+
+## Angular Signals
+
+### Layout State with Signals
+
+The `LayoutService` demonstrates signal-based state management:
+
+```typescript
+// src/app/layout/service/layout.service.ts:28-77
+@Injectable({ providedIn: 'root' })
+export class LayoutService {
+    // Initial configuration
+    _config: layoutConfig = {
+        preset: 'Aura',
+        primary: 'emerald',
+        surface: null,
+        darkTheme: false,
+        menuMode: 'static'
+    };
+    
+    // Initial state
+    _state: LayoutState = {
+        staticMenuDesktopInactive: false,
+        overlayMenuActive: false,
+        configSidebarVisible: false,
+        staticMenuMobileActive: false,
+        menuHoverActive: false
+    };
+    
+    // Reactive signals
+    layoutConfig = signal<layoutConfig>(this._config);
+    layoutState = signal<LayoutState>(this._state);
+    
+    // Computed properties (derived state)
+    theme = computed(() => 
+        this.layoutConfig()?.darkTheme ? 'light' : 'dark'
+    );
+    
+    isSidebarActive = computed(() => 
+        this.layoutState().overlayMenuActive || 
+        this.layoutState().staticMenuMobileActive
+    );
+    
+    isDarkTheme = computed(() => this.layoutConfig().darkTheme);
+    
+    getPrimary = computed(() => this.layoutConfig().primary);
+    
+    getSurface = computed(() => this.layoutConfig().surface);
+    
+    isOverlay = computed(() => 
+        this.layoutConfig().menuMode === 'overlay'
+    );
+    
+    // Transition state
+    transitionComplete = signal<boolean>(false);
+}
+```
+
+<Note>
+Signals provide **automatic change detection** and **memoization** for computed values.
+</Note>
+
+### Updating Signal State
+
+```typescript
+// Update entire signal
+this.layoutService.layoutConfig.set(newConfig);
+
+// Update specific properties
+this.layoutService.layoutConfig.update((state) => ({
+    ...state,
+    darkTheme: !state.darkTheme
+}));
+
+// Update nested state
+this.layoutService.layoutState.update((prev) => ({
+    ...prev,
+    overlayMenuActive: !prev.overlayMenuActive
+}));
+```
+
+### Reading Signal Values
+
+In templates:
+
+```html
+<!-- Access signal value with () -->
+<div [class.dark-layout]="layoutService.isDarkTheme()">
+    <span>Current theme: {{ layoutService.theme() }}</span>
+</div>
+
+<!-- Computed signal -->
+<aside [class.active]="layoutService.isSidebarActive()">
+    <!-- Sidebar content -->
+</aside>
+```
+
+In components:
+
+```typescript
+ngOnInit() {
+    // Read current value
+    const isDark = this.layoutService.isDarkTheme();
+    console.log('Dark mode:', isDark);
+    
+    // React to changes with effect
+    effect(() => {
+        const config = this.layoutService.layoutConfig();
+        console.log('Config changed:', config);
+    });
+}
+```
+
+### Effects for Side Effects
+
+```typescript
+// src/app/layout/service/layout.service.ts:82-98
+constructor() {
+    effect(() => {
+        const config = this.layoutConfig();
+        if (config) {
+            this.onConfigUpdate();
+        }
+    });
+    
+    effect(() => {
+        const config = this.layoutConfig();
+        
+        if (!this.initialized || !config) {
+            this.initialized = true;
+            return;
+        }
+        
+        this.handleDarkModeTransition(config);
+    });
+}
+```
+
+<Tip>
+Use `effect()` for side effects that should run when signals change, like updating localStorage or DOM classes.
+</Tip>
+
+## RxJS Observables
+
+### Subject-Based Events
+
+The `LayoutService` uses Subjects for event broadcasting:
+
+```typescript
+// src/app/layout/service/layout.service.ts:49-63
+private configUpdate = new Subject<layoutConfig>();
+private overlayOpen = new Subject<any>();
+private menuSource = new Subject<MenuChangeEvent>();
+private resetSource = new Subject();
+
+// Public observables
+menuSource$ = this.menuSource.asObservable();
+resetSource$ = this.resetSource.asObservable();
+configUpdate$ = this.configUpdate.asObservable();
+overlayOpen$ = this.overlayOpen.asObservable();
+
+// Emit events
+onConfigUpdate() {
+    this._config = { ...this.layoutConfig() };
+    this.configUpdate.next(this.layoutConfig());
+}
+
+onMenuStateChange(event: MenuChangeEvent) {
+    this.menuSource.next(event);
+}
+
+reset() {
+    this.resetSource.next(true);
+}
+```
+
+### Subscribing to Observables
+
+```typescript
+ngOnInit() {
+    // Subscribe to menu events
+    this.layoutService.menuSource$.subscribe((event) => {
+        console.log('Menu event:', event);
+        this.handleMenuChange(event);
+    });
+    
+    // Subscribe to config changes
+    this.layoutService.configUpdate$.subscribe((config) => {
+        console.log('Config updated:', config);
+    });
+}
+
+ngOnDestroy() {
+    // Clean up subscriptions
+    this.subscription?.unsubscribe();
+}
+```
+
+### HTTP Service Observables
+
+All HTTP services return Observables:
+
+```typescript
+loadCustomers() {
+    this.masterService.getClients(this.companiaId).subscribe({
+        next: (res) => {
+            if (res.code === 0) {
+                this.customers = res.data || [];
+                this.filteredCustomers = [...this.customers];
+            }
+        },
+        error: (err) => {
+            this.messageService.add({
+                severity: 'error',
+                detail: 'Error loading customers'
+            });
+        },
+        complete: () => {
+            console.log('Request completed');
+        }
+    });
+}
+```
+
+## Component State Patterns
+
+### Local Component State
+
+Most components manage local state with properties:
+
+```typescript
+// src/app/components/pages/inventory/inventory.component.ts:39-67
+export class InventoryComponent implements OnInit {
+    // Data arrays
+    inventory: Product[] = [];
+    filteredInventory: Product[] = [];
+    categories: Category[] = [];
+    masterWarehouses: Warehouse[] = [];
+    
+    // UI state
+    loading: boolean = false;
+    showAddDialog = false;
+    showEditDialog = false;
+    
+    // Form state
+    newProduct: any = {};
+    warehousesUI: WarehouseUI[] = [];
+    
+    // Filter state
+    filters = {
+        nameOrReference: '',
+        category: null,
+        extension1: '',
+        extension2: '',
+        active: true,
+        minPrice: null,
+        maxPrice: null
+    };
+    
+    // Computed values
+    totalItems = 0;
+    totalValue = 0;
+    lowStockItems: Product[] = [];
+    
+    // Permissions
+    canView = false;
+    canCreate = false;
+    canEdit = false;
+    canDelete = false;
+    canExport = false;
+}
+```
+
+### Derived State (Manual)
+
+```typescript
+// src/app/components/pages/inventory/inventory.component.ts:241-256
+calculateTotals() {
+    this.totalItems = 0;
+    this.totalValue = 0;
+    this.lowStockItems = [];
+    
+    this.inventory.forEach((item) => {
+        const stockTotal = this.getProductTotalStock(item);
+        this.totalItems += stockTotal;
+        this.totalValue += stockTotal * (item.price || 0);
+        
+        if (item.manageStock && stockTotal <= 5) {
+            this.lowStockItems.push(item);
+        }
+    });
+}
+
+getProductTotalStock(product: Product): number {
+    if (!product.existencias) return 0;
+    return product.existencias.reduce(
+        (acc, curr) => acc + (curr.stock || 0), 
+        0
+    );
+}
+```
+
+### Filter State Management
+
+```typescript
+// src/app/components/pages/inventory/inventory.component.ts:258-277
+filterProducts() {
+    this.filteredInventory = this.inventory.filter((item) => {
+        const matchesSearch = 
+            !this.filters.nameOrReference ||
+            item.name.toLowerCase().includes(
+                this.filters.nameOrReference.toLowerCase()
+            ) ||
+            item.reference?.toLowerCase().includes(
+                this.filters.nameOrReference.toLowerCase()
+            ) ||
+            item.barcode?.toLowerCase().includes(
+                this.filters.nameOrReference.toLowerCase()
+            );
+        
+        const matchesCategory = 
+            !this.filters.category || 
+            item.categoryId === this.filters.category;
+        
+        const matchesActive = item.active === this.filters.active;
+        
+        return matchesSearch && matchesCategory && matchesActive;
+    });
+}
+
+resetFilters() {
+    this.filters = {
+        nameOrReference: '', 
+        category: null, 
+        extension1: '', 
+        extension2: '', 
+        unitMeasure: '', 
+        active: true, 
+        minPrice: null, 
+        maxPrice: null
+    };
+    this.filterProducts();
+}
+```
+
+## Session State Management
+
+### Authentication Service
+
+The `AuthService` manages user session state:
+
+```typescript
+// src/app/components/pages/core/guards/auth.service.ts:9-34
+@Injectable({ providedIn: 'root' })
+export class AuthService {
+    private apiUrl = 'https://localhost:7197/api/auth';
+    
+    constructor(
+        private http: HttpClient,
+        private storage: AuthStorageService,
+        private loginService: LoginService
+    ) {}
+    
+    setData(data: any) {
+        this.storage.setSession(data);
+    }
+    
+    logout(): void {
+        this.storage.clear();
+    }
+    
+    isAuthenticated(): boolean {
+        return !!this.storage.getSession();
+    }
+    
+    getSession(): AuthSession | null {
+        return this.storage.getSession();
+    }
+}
+```
+
+### Using Session in Components
+
+```typescript
+ngOnInit() {
+    const session = this.authService.getSession() as AuthSession;
+    
+    if (!session) {
+        // Redirect to login
+        this.router.navigate(['/login']);
+        return;
+    }
+    
+    // Use session data
+    this.companiaId = session.companiaId;
+    this.userId = session.userId;
+    
+    // Load user-specific data
+    this.loadPermissions(session.userId, session.companiaId);
+    this.loadData();
+}
+```
+
+### Updating Session
+
+```typescript
+// src/app/layout/component/app.topbar.ts:156-172
+changeCompany(company: ICompanySession) {
+    this.selectedCompany = company;
+    
+    const session = this.authService.getSession() as AuthSession;
+    
+    const updatedSession: AuthSession = {
+        ...session,
+        companiaId: company.companiaId
+    };
+    
+    console.log('Changing company to:', company);
+    console.log('New session:', updatedSession);
+    
+    this.authService.setData(updatedSession);
+    
+    location.reload(); // Reload to apply changes
+}
+```
+
+## Permission-Based State
+
+### Loading Permissions
+
+```typescript
+// src/app/components/pages/inventory/inventory.component.ts:110-153
+ngOnInit() {
+    const session = this.authService.getSession() as AuthSession;
+    
+    if (!session) {
+        this.resetPermissions();
+        return;
+    }
+    
+    const { userId, companiaId } = session;
+    
+    this.loginService.getPermissions(userId, companiaId).subscribe({
+        next: (permissions) => {
+            this.permissions = permissions.data ?? [];
+            this.applyPermissions();
+        },
+        error: () => this.resetPermissions()
+    });
+}
+
+private applyPermissions(): void {
+    const moduleName = 'Inventario';
+    const permission = this.permissions.find(
+        (p) => p.module === moduleName
+    );
+    
+    if (!permission) {
+        this.resetPermissions();
+        return;
+    }
+    
+    this.canView = permission.canView;
+    this.canCreate = permission.canCreate;
+    this.canEdit = permission.canEdit;
+    this.canDelete = permission.canDelete;
+    this.canExport = permission.canExport;
+}
+
+private resetPermissions(): void {
+    this.canView = false;
+    this.canCreate = false;
+    this.canEdit = false;
+    this.canDelete = false;
+    this.canExport = false;
+}
+```
+
+### Permission-Based UI
+
+```html
+<button 
+    *ngIf="canCreate"
+    pButton 
+    label="Nuevo Producto" 
+    (click)="openAddDialog()"
+></button>
+
+<button 
+    *ngIf="canExport"
+    pButton 
+    label="Exportar" 
+    (click)="exportToExcel()"
+></button>
+```
+
+## Form State Management
+
+### Dialog State
+
+```typescript
+// Modal state
+showAddDialog = false;
+showEditDialog = false;
+isEditing = false;
+
+// Current form data
+currentCustomer: Customer = this.getEmptyCustomer();
+
+openAddDialog() {
+    this.currentCustomer = this.getEmptyCustomer();
+    this.isEditing = false;
+    this.showAddDialog = true;
+}
+
+editCustomer(customer: Customer) {
+    this.currentCustomer = { ...customer };
+    this.isEditing = true;
+    this.showDialog = true;
+}
+
+closeDialog() {
+    this.showDialog = false;
+    this.currentCustomer = this.getEmptyCustomer();
+}
+```
+
+### Multi-Step Form State
+
+```typescript
+// Inventory product with warehouses
+prepareWarehouseUI(product?: Product) {
+    this.warehousesUI = this.masterWarehouses.map((wh) => {
+        const stockRecord = product?.existencias?.find(
+            (e) => e.wareHouseId === wh.id
+        );
+        
+        const limitRecord = product?.maximosMinimos?.find(
+            (m) => m.wareHouseId === wh.id
+        );
+        
+        return {
+            warehouseId: wh.id!,
+            name: wh.name,
+            stock: stockRecord?.stock ?? 0,
+            minStock: limitRecord?.minStock ?? 0,
+            maxStock: limitRecord?.maxStock ?? 0
+        };
+    });
+}
+```
+
+## Loading State
+
+```typescript
+loading: boolean = false;
+
+loadData() {
+    this.loading = true;
+    
+    this.service.getData(this.companiaId).subscribe({
+        next: (res) => {
+            this.data = res.data || [];
+            this.loading = false;
+        },
+        error: (err) => {
+            this.loading = false;
+            this.messageService.add({
+                severity: 'error',
+                detail: 'Error loading data'
+            });
+        }
+    });
+}
+```
+
+```html
+<div *ngIf="loading" class="flex justify-center items-center p-8">
+    <i class="pi pi-spin pi-spinner text-4xl"></i>
+</div>
+
+<div *ngIf="!loading">
+    <!-- Content -->
+</div>
+```
+
+## State Synchronization Patterns
+
+### Keeping Filtered and Original Data in Sync
+
+```typescript
+loadCustomers() {
+    this.masterService.getClients(this.companiaId).subscribe({
+        next: (res) => {
+            if (res.code === 0) {
+                this.customers = res.data || [];
+                this.filteredCustomers = [...this.customers]; // Sync
+            }
+        }
+    });
+}
+
+deleteCustomer(customer: Customer) {
+    this.masterService.DeleteClient(customer).subscribe({
+        next: (res) => {
+            if (res.code === 0) {
+                // Remove from both arrays
+                this.customers = this.customers.filter(
+                    (c) => c.id !== customer.id
+                );
+                this.filteredCustomers = [...this.customers]; // Sync
+            }
+        }
+    });
+}
+```
+
+### Recalculating Derived State
+
+```typescript
+loadInventory() {
+    this.inventoryService.getProducts(this.companiaId).subscribe({
+        next: (res) => {
+            this.inventory = res.data || [];
+            this.filteredInventory = [...this.inventory];
+            
+            // Recalculate derived state
+            this.calculateTotals();
+        }
+    });
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Signals for UI State" icon="signal">
+    Use signals for reactive UI state that needs automatic change detection
+  </Card>
+  <Card title="Observables for Async" icon="arrows-spin">
+    Use RxJS Observables for async operations and HTTP requests
+  </Card>
+  <Card title="Services for Shared State" icon="share-nodes">
+    Use services with `providedIn: 'root'` for app-wide state
+  </Card>
+  <Card title="Immutable Updates" icon="lock">
+    Always create new objects/arrays when updating state
+  </Card>
+</CardGroup>
+
+## State Management Comparison
+
+| Pattern | Use Case | Example |
+|---------|----------|----------|
+| **Signals** | Reactive UI state, computed values | Layout config, theme |
+| **RxJS Subjects** | Event broadcasting | Menu events, config updates |
+| **HTTP Observables** | Async data fetching | API calls |
+| **Component Properties** | Local component state | Form data, filters |
+| **Services** | Shared app state | Auth session, permissions |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Overview" icon="house" href="/components/overview">
+    Return to component architecture overview
+  </Card>
+  <Card title="Services" icon="code" href="/components/services">
+    Learn more about service patterns
+  </Card>
+</CardGroup>

@@ -1,0 +1,594 @@
+---
+title: 'Shared Services'
+description: 'Documentation for shared services including master data, authentication, and business logic services'
+---
+
+## Service Architecture
+
+The application uses **Injectable Services** with `providedIn: 'root'` for application-wide singleton instances.
+
+## Service Organization
+
+```
+src/app/components/
+├── services/                  # Business logic services
+│   ├── master.service.ts      # Master data (categories, warehouses, etc.)
+│   ├── pos.service.ts         # POS and invoice operations
+│   ├── inventory.service.ts   # Inventory management
+│   ├── login.service.ts       # Authentication & permissions
+│   └── invoice-pdf.service.ts # PDF generation
+│
+├── pages/core/guards/         # Core services
+│   ├── auth.service.ts        # Session management
+│   ├── auth-storage.service.ts # Encrypted storage
+│   ├── security.service.ts    # Encryption utilities
+│   └── cookie.service.ts      # Cookie management
+│
+└── layout/service/
+    └── layout.service.ts      # UI layout state
+```
+
+## Master Service
+
+The `MasterService` handles all master data operations (categories, warehouses, customers, suppliers, etc.).
+
+### Service Definition
+
+```typescript
+// src/app/components/services/master.service.ts:12-16
+@Injectable({ providedIn: 'root' })
+export class MasterService {
+    private apiUrl = 'https://localhost:7197/api/';
+    
+    constructor(private http: HttpClient) {}
+}
+```
+
+### Category Operations
+
+```typescript
+// src/app/components/services/master.service.ts:22-32
+getCategories(companiaId: number): Observable<ApiResponse<Category[]>> {
+    return this.http.get<ApiResponse<Category[]>>(
+        `${this.apiUrl}Master/GetCategories/${companiaId}`
+    );
+}
+
+createCategory(model: Category): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(
+        `${this.apiUrl}Master/CreateCategory`, 
+        model
+    );
+}
+
+deleteCategory(model: Category): Observable<ApiResponse<any>> {
+    return this.http.request<ApiResponse<any>>(
+        'delete', 
+        `${this.apiUrl}Master/DeleteCategory`, 
+        { body: model }
+    );
+}
+```
+
+### Warehouse Operations
+
+```typescript
+// src/app/components/services/master.service.ts:38-48
+getWarehouses(companiaId: number): Observable<ApiResponse<Warehouse[]>> {
+    return this.http.get<ApiResponse<Warehouse[]>>(
+        `${this.apiUrl}Master/GetWarehouses/${companiaId}`
+    );
+}
+
+createWarehouse(model: Warehouse): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(
+        `${this.apiUrl}Master/CreateWarehouse`, 
+        model
+    );
+}
+
+deleteWarehouse(model: Warehouse): Observable<ApiResponse<any>> {
+    return this.http.request<ApiResponse<any>>(
+        'delete', 
+        `${this.apiUrl}Master/DeleteWarehouse`, 
+        { body: model }
+    );
+}
+```
+
+### Customer Operations
+
+```typescript
+// src/app/components/services/master.service.ts:70-80
+getClients(companiaId: number): Observable<ApiResponse<Customer[]>> {
+    return this.http.get<ApiResponse<Customer[]>>(
+        `${this.apiUrl}Master/GetClients/${companiaId}`
+    );
+}
+
+CreateClient(model: Customer): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(
+        `${this.apiUrl}Master/CreateClient`, 
+        model
+    );
+}
+
+DeleteClient(model: Customer): Observable<ApiResponse<any>> {
+    return this.http.request<ApiResponse<any>>(
+        'delete', 
+        `${this.apiUrl}Master/DeleteClient`, 
+        { body: model }
+    );
+}
+```
+
+### Role & Permission Management
+
+```typescript
+// src/app/components/services/master.service.ts:112-146
+getRoles(companiaId: number): Observable<ApiResponse<Role[]>> {
+    return this.http.get<ApiResponse<Role[]>>(
+        `${this.apiUrl}Master/GetRoles/${companiaId}`
+    );
+}
+
+saveRole(model: any): Observable<ApiResponse<number>> {
+    return this.http.post<ApiResponse<number>>(
+        `${this.apiUrl}Master/SaveRole`, 
+        model
+    );
+}
+
+deleteRole(roleId: number): Observable<ApiResponse<boolean>> {
+    return this.http.delete<ApiResponse<boolean>>(
+        `${this.apiUrl}Master/DeleteRole/${roleId}`
+    );
+}
+
+getRolePermissions(roleId: number): Observable<ApiResponse<Permission[]>> {
+    return this.http.get<ApiResponse<Permission[]>>(
+        `${this.apiUrl}Master/GetRolePermissions/${roleId}`
+    );
+}
+
+saveRolePermission(model: any): Observable<ApiResponse<boolean>> {
+    return this.http.post<ApiResponse<boolean>>(
+        `${this.apiUrl}Master/SaveRolePermission`, 
+        model
+    );
+}
+```
+
+### Configuration Management
+
+```typescript
+// src/app/components/services/master.service.ts:168-174
+getConfiguration(companiaId: number) {
+    return this.http.get<ApiResponse<ConfigurationRequest>>(
+        `${this.apiUrl}Master/GetConfiguration/${companiaId}`
+    );
+}
+
+saveConfiguration(model: ConfigurationRequest) {
+    return this.http.post<ApiResponse<any>>(
+        `${this.apiUrl}Master/SaveConfiguration`, 
+        model
+    );
+}
+```
+
+<Note>
+All master data services return `Observable<ApiResponse<T>>` for consistent error handling.
+</Note>
+
+## POS Service
+
+Handles Point of Sale operations including invoices and stock reservations.
+
+### Invoice Operations
+
+```typescript
+// src/app/components/services/pos.service.ts:10-30
+@Injectable({ providedIn: 'root' })
+export class PosService {
+    private apiUrl = 'https://localhost:7197/api/';
+    
+    constructor(private http: HttpClient) {}
+    
+    createInvoice(invoice: any) {
+        return this.http.post<ApiResponse<any>>(
+            `${this.apiUrl}pos/CreateInvoice`, 
+            invoice
+        );
+    }
+    
+    getInvoices(
+        startDate: Date, 
+        endDate: Date, 
+        companyId: number
+    ): Observable<ApiResponse<IInvoiceClients[]>> {
+        return this.http.get<ApiResponse<IInvoiceClients[]>>(
+            `${this.apiUrl}pos/GetInvoicesAll/${startDate.toISOString()}/${endDate.toISOString()}/${companyId}`
+        );
+    }
+    
+    getInvoiceDetail(
+        invoiceId: number, 
+        companyId: number
+    ): Observable<ApiResponse<IInvoiceClients>> {
+        return this.http.get<ApiResponse<IInvoiceClients>>(
+            `${this.apiUrl}pos/GetInvoiceDetail/${invoiceId}/${companyId}`
+        );
+    }
+    
+    cancelInvoice(
+        invoiceId?: number, 
+        companyId?: number
+    ): Observable<ApiResponse<IInvoiceClients>> {
+        return this.http.get<ApiResponse<IInvoiceClients>>(
+            `${this.apiUrl}pos/CancelInvoice/${invoiceId}/${companyId}`
+        );
+    }
+}
+```
+
+### Stock Reservation
+
+```typescript
+// src/app/components/services/pos.service.ts:82-92
+validateAndReserveStock(payload: StockReservationRequest) {
+    return this.http.post<ApiResponse<StockReservationResponse>>(
+        `${this.apiUrl}pos/ValidateAndReserve`, 
+        payload
+    );
+}
+
+cancelInvoiceReservations(payload: StockReservationRequest) {
+    return this.http.post<ApiResponse<any>>(
+        `${this.apiUrl}pos/ValidateAndReserve`, 
+        payload
+    );
+}
+
+cancelInvoiceAll(facturaTempId?: string, companiaId?: number) {
+    return this.http.get<ApiResponse<any>>(
+        `${this.apiUrl}pos/CancelInvoiceAll/${facturaTempId}/${companiaId}`
+    );
+}
+```
+
+### Financing Operations
+
+```typescript
+// src/app/components/services/pos.service.ts:44-68
+getFinancings(): Observable<ApiResponse<GetFinancing[]>> {
+    return this.http.get<ApiResponse<GetFinancing[]>>(
+        `${this.apiUrl}pos/GetFinancings`
+    );
+}
+
+getFinancingPayments(
+    financingId: number
+): Observable<ApiResponse<GetFinancing[]>> {
+    const params = new HttpParams()
+        .set('option', 'get_payments')
+        .set('id', financingId);
+    return this.http.get<ApiResponse<GetFinancing[]>>(
+        `${this.apiUrl}pos/GetFinancingPayments`, 
+        { params }
+    );
+}
+
+addFinancingPayment(model: FinancingRequest): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(
+        `${this.apiUrl}pos/AddPayment`, 
+        model
+    );
+}
+
+generateClearance(model: FinancingRequest): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(
+        `${this.apiUrl}pos/GenerateClearance`, 
+        model
+    );
+}
+```
+
+## Authentication Service
+
+Manages user sessions and authentication state.
+
+### Service Definition
+
+```typescript
+// src/app/components/pages/core/guards/auth.service.ts:9-17
+@Injectable({ providedIn: 'root' })
+export class AuthService {
+    private apiUrl = 'https://localhost:7197/api/auth';
+    
+    constructor(
+        private http: HttpClient,
+        private storage: AuthStorageService,
+        private loginService: LoginService
+    ) {}
+}
+```
+
+### Session Management
+
+```typescript
+// src/app/components/pages/core/guards/auth.service.ts:19-34
+setData(data: any) {
+    this.storage.setSession(data);
+}
+
+logout(): void {
+    this.storage.clear();
+}
+
+isAuthenticated(): boolean {
+    return !!this.storage.getSession();
+}
+
+getSession(): AuthSession | null {
+    return this.storage.getSession();
+}
+```
+
+### Usage in Components
+
+```typescript
+ngOnInit() {
+    const session = this.authService.getSession() as AuthSession;
+    if (session) {
+        this.companiaId = session.companiaId;
+        this.userId = session.userId;
+    }
+    
+    // Load data based on session
+    this.loadData();
+}
+```
+
+<Tip>
+The `AuthService` uses `AuthStorageService` for encrypted session storage in cookies.
+</Tip>
+
+## Layout Service
+
+Manages UI layout state using Angular signals.
+
+### Configuration & State
+
+```typescript
+// src/app/layout/service/layout.service.ts:28-77
+@Injectable({ providedIn: 'root' })
+export class LayoutService {
+    _config: layoutConfig = {
+        preset: 'Aura',
+        primary: 'emerald',
+        surface: null,
+        darkTheme: false,
+        menuMode: 'static'
+    };
+    
+    _state: LayoutState = {
+        staticMenuDesktopInactive: false,
+        overlayMenuActive: false,
+        configSidebarVisible: false,
+        staticMenuMobileActive: false,
+        menuHoverActive: false
+    };
+    
+    // Signals for reactive state
+    layoutConfig = signal<layoutConfig>(this._config);
+    layoutState = signal<LayoutState>(this._state);
+    
+    // Observables for events
+    private configUpdate = new Subject<layoutConfig>();
+    private overlayOpen = new Subject<any>();
+    private menuSource = new Subject<MenuChangeEvent>();
+    private resetSource = new Subject();
+    
+    menuSource$ = this.menuSource.asObservable();
+    resetSource$ = this.resetSource.asObservable();
+    configUpdate$ = this.configUpdate.asObservable();
+    overlayOpen$ = this.overlayOpen.asObservable();
+    
+    // Computed properties
+    theme = computed(() => 
+        this.layoutConfig()?.darkTheme ? 'light' : 'dark'
+    );
+    
+    isSidebarActive = computed(() => 
+        this.layoutState().overlayMenuActive || 
+        this.layoutState().staticMenuMobileActive
+    );
+    
+    isDarkTheme = computed(() => this.layoutConfig().darkTheme);
+    
+    getPrimary = computed(() => this.layoutConfig().primary);
+    
+    getSurface = computed(() => this.layoutConfig().surface);
+    
+    isOverlay = computed(() => this.layoutConfig().menuMode === 'overlay');
+}
+```
+
+### Reactive State Updates
+
+```typescript
+// Update layout config
+this.layoutService.layoutConfig.update((state) => ({
+    ...state,
+    darkTheme: !state.darkTheme
+}));
+
+// Update layout state
+this.layoutService.layoutState.update((prev) => ({
+    ...prev,
+    overlayMenuActive: !prev.overlayMenuActive
+}));
+```
+
+### Subscribe to Changes
+
+```typescript
+ngOnInit() {
+    this.layoutService.configUpdate$.subscribe((config) => {
+        console.log('Layout config changed:', config);
+    });
+    
+    this.layoutService.menuSource$.subscribe((event) => {
+        console.log('Menu event:', event);
+    });
+}
+```
+
+## Service Patterns
+
+### Generic API Response Type
+
+```typescript
+// src/app/components/pages/api/shared.ts:1-5
+export interface ApiResponse<T> {
+    code: number;
+    message: string;
+    data: T;
+}
+```
+
+### Error Handling
+
+```typescript
+loadData() {
+    this.service.getData(this.companiaId).subscribe({
+        next: (res) => {
+            if (res.code === 0) {
+                this.data = res.data || [];
+            } else {
+                this.messageService.add({
+                    severity: 'warn',
+                    summary: 'Advertencia',
+                    detail: res.message || 'No se pudieron cargar los datos.'
+                });
+            }
+        },
+        error: (err) => {
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Error',
+                detail: 'Error al cargar datos desde el servidor.'
+            });
+            console.error(err);
+        }
+    });
+}
+```
+
+### HTTP Delete with Body
+
+```typescript
+// Some APIs require DELETE with request body
+deleteItem(model: Category): Observable<ApiResponse<any>> {
+    return this.http.request<ApiResponse<any>>(
+        'delete', 
+        `${this.apiUrl}Master/DeleteCategory`, 
+        { body: model }
+    );
+}
+```
+
+<Note>
+Using `http.request()` allows sending a body with DELETE requests.
+</Note>
+
+## Service Injection
+
+### Component-Level Injection
+
+```typescript
+@Component({
+    selector: 'app-inventory',
+    standalone: true,
+    providers: [MessageService] // Component-level provider
+})
+export class InventoryComponent implements OnInit {
+    constructor(
+        private inventoryService: InventoryService,  // Root-level
+        private masterService: MasterService,        // Root-level
+        private messageService: MessageService,      // Component-level
+        private authService: AuthService             // Root-level
+    ) {}
+}
+```
+
+### Root-Level Services
+
+```typescript
+@Injectable({ providedIn: 'root' })
+export class MasterService {
+    // Singleton instance shared across the app
+}
+```
+
+## HTTP Interceptors
+
+While not explicitly shown in the codebase, consider adding interceptors for:
+
+- **Authentication**: Automatically add auth tokens to requests
+- **Error Handling**: Centralized error handling
+- **Loading State**: Global loading indicators
+
+```typescript
+// Example: auth.interceptor.ts
+@Injectable()
+export class AuthInterceptor implements HttpInterceptor {
+    constructor(private authService: AuthService) {}
+    
+    intercept(
+        req: HttpRequest<any>, 
+        next: HttpHandler
+    ): Observable<HttpEvent<any>> {
+        const session = this.authService.getSession();
+        
+        if (session?.token) {
+            req = req.clone({
+                setHeaders: {
+                    Authorization: `Bearer ${session.token}`
+                }
+            });
+        }
+        
+        return next.handle(req);
+    }
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Single Responsibility" icon="bullseye">
+    Each service handles one domain (master data, POS, inventory, etc.)
+  </Card>
+  <Card title="Type Safety" icon="shield-check">
+    Use TypeScript interfaces for all API requests and responses
+  </Card>
+  <Card title="Observable Patterns" icon="arrows-spin">
+    Return Observables from service methods for reactive programming
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation">
+    Handle errors consistently using RxJS operators and MessageService
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Integration" icon="plug" href="/components/api-integration">
+    Learn about API patterns and interfaces
+  </Card>
+  <Card title="State Management" icon="database" href="/components/state-management">
+    Explore state management patterns
+  </Card>
+</CardGroup>

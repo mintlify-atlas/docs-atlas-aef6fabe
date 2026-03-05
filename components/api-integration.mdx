@@ -1,0 +1,770 @@
+---
+title: 'API Integration'
+description: 'Documentation for API service patterns, interfaces, and data models used throughout the application'
+---
+
+## API Architecture
+
+The application follows a **typed API integration pattern** with TypeScript interfaces for all requests and responses.
+
+## API Response Pattern
+
+All API endpoints return a standardized response structure:
+
+```typescript
+// src/app/components/pages/api/shared.ts:1-5
+export interface ApiResponse<T> {
+    code: number;      // 0 = success, non-zero = error
+    message: string;   // User-friendly message
+    data: T;          // Typed response data
+}
+```
+
+### Response Code Convention
+
+- `0`: Success
+- `200`: Success (alternate)
+- Non-zero: Error or validation failure
+
+### Usage Example
+
+```typescript
+this.masterService.getCategories(companiaId).subscribe({
+    next: (res: ApiResponse<Category[]>) => {
+        if (res.code === 0 || res.code === 200) {
+            this.categories = res.data || [];
+        } else {
+            this.messageService.add({
+                severity: 'warn',
+                detail: res.message
+            });
+        }
+    },
+    error: (err) => {
+        this.messageService.add({
+            severity: 'error',
+            detail: 'Error de conexión'
+        });
+    }
+});
+```
+
+## Core API Interfaces
+
+### Shared Models
+
+#### Product Interface
+
+```typescript
+// src/app/components/pages/api/shared.ts:43-83
+export interface Product {
+    id: number;
+    companiaId: number;
+    
+    code: number;
+    name: string;
+    description: string;
+    barcode: string;
+    
+    reference?: string;
+    extension1?: string;
+    extension2?: string;
+    tag?: string;
+    
+    price: number;
+    imageUrl?: string;
+    
+    categoryId: number;
+    category?: string;
+    
+    unitMeasureId: number;
+    unitMeasure?: string;
+    
+    active: boolean;
+    manageStock: boolean;
+    
+    reservedStock: number;
+    
+    createdAt?: string;
+    updatedAt?: string;
+    
+    hasPromotion?: boolean;
+    hasDiscount?: boolean;
+    discountPercent?: number;
+    
+    // Multi-warehouse support
+    maximosMinimos: ProductMinMaxByWarehouse[];
+    existencias: ProductStockByWarehouse[];
+}
+```
+
+#### Product Warehouse Data
+
+```typescript
+// src/app/components/pages/api/shared.ts:84-95
+export interface ProductMinMaxByWarehouse {
+    wareHouse: string;
+    wareHouseId: number;
+    minStock: number;
+    maxStock: number;
+}
+
+export interface ProductStockByWarehouse {
+    wareHouse: string;
+    wareHouseId: number;
+    stock: number;
+}
+```
+
+#### Product Create Request
+
+```typescript
+// src/app/components/pages/api/shared.ts:96-126
+export interface ProductCreateRequest {
+    id: number;          // 0 for new, > 0 for update
+    userId: number;
+    companiaId: number;
+    
+    name: string;
+    description: string;
+    barcode: string;
+    
+    reference?: string;
+    extension1?: string;
+    extension2?: string;
+    tag?: string;
+    
+    price: number;
+    imageUrl?: string;
+    
+    categoryId: number;
+    unitMeasureId: number;
+    
+    active: boolean;
+    manageStock: boolean;
+    
+    warehouses: ProductWarehouseRequest[];
+}
+
+export interface ProductWarehouseRequest {
+    warehouseId: number;
+    stock?: number;
+    minStock?: number;
+    maxStock?: number;
+}
+```
+
+<Tip>
+Separate read and write models allow the API to return additional computed fields (like `category` name) that aren't needed in create/update requests.
+</Tip>
+
+#### Customer Interface
+
+```typescript
+// src/app/components/pages/api/shared.ts:128-155
+export interface Customer {
+    id: number;
+    companiaId: number;
+    userId: number;
+    identificationTypeId: number;
+    document: string;
+    firstName: string;
+    middleName?: string;
+    lastName: string;
+    secondLastName?: string;
+    phone?: string;
+    email: string;
+    
+    // Location data
+    city?: string;
+    department?: string;
+    country?: string;
+    address?: string;
+    
+    // Business data
+    isCompany: boolean;
+    nit?: string;
+    businessName?: string;
+    
+    // Audit
+    createdAt?: Date;
+    updatedAt?: Date;
+}
+```
+
+#### Warehouse & Category
+
+```typescript
+// src/app/components/pages/api/shared.ts:7-27
+export interface Warehouse {
+    id?: number;
+    companiaId?: number;
+    warehouseId: string;
+    name: string;
+    code: string;
+    address?: string;
+    city?: string;
+    phone?: string;
+    active?: boolean;
+    createdAt?: Date;
+}
+
+export interface Category {
+    id?: number;
+    companiaId?: number;
+    name: string;
+    description?: string;
+    active?: boolean;
+    createdAt?: Date;
+}
+```
+
+## POS API Interfaces
+
+### Invoice Structure
+
+```typescript
+// src/app/components/pages/api/pos.ts:3-19
+export interface Invoice {
+    id?: string;
+    index: number;
+    items: CartItem[];
+    customer: Customer | null;
+    generalDiscount: number;
+    detailDiscount: number;
+    grossSubtotal: number;
+    totalVat: number;
+    subtotal: number;
+    total: number;
+    paymentMethods: PaymentMethod[];
+    deliveryInfo?: DeliveryInfo;
+    invoiceNumber?: string;
+    date?: Date;
+    tempId?: string;
+}
+```
+
+### Cart Item
+
+```typescript
+// src/app/components/pages/api/pos.ts:49-56
+export interface CartItem extends PosProduct {
+    quantity: number;
+    prevQuantity: number;
+    discount: number;
+    subtotal: number;
+    discountValue: number;
+    total: number;
+}
+
+export interface PosProduct {
+    id: number;
+    code: number;
+    reference: string;
+    extension1?: string;
+    extension2?: string;
+    tag?: string | null;
+    
+    barcode: string;
+    name: string;
+    description: string;
+    price: number;
+    
+    category: string;
+    categoryId: number;
+    
+    unitMeasure: string;
+    unitMeasureId: number;
+    
+    stock: number;
+    manageStock: boolean;
+    
+    hasDiscount: boolean | null;
+    discountPercent: number;
+}
+```
+
+### Payment Methods
+
+```typescript
+// src/app/components/pages/api/pos.ts:21-25
+export interface PaymentMethod {
+    type: 'cash' | 'card' | 'transfer' | 'financed' | 'other';
+    amount: number;
+    months?: number;  // For financed payments
+}
+```
+
+### Delivery Information
+
+```typescript
+// src/app/components/pages/api/pos.ts:27-35
+export interface DeliveryInfo {
+    isDelivery: boolean;
+    address: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    phone: string;
+    notes?: string;
+}
+```
+
+### Stock Reservation
+
+```typescript
+// src/app/components/pages/api/pos.ts:75-88
+export interface StockReservationRequest {
+    action: 'RESERVAR' | 'CANCELAR' | 'RESTAR';
+    productId: number;
+    quantity: number;
+    companiaId: number;
+    userId: number;
+    facturaTempId?: string;
+}
+
+export interface StockReservationResponse {
+    success: number;
+    stockDisponible: number;
+    motivo: string;
+}
+```
+
+### Invoice Response
+
+```typescript
+// src/app/components/pages/api/pos.ts:90-155
+export interface IInvoiceClients {
+    id: number;
+    invoice_Number?: string;
+    client_Name?: string;
+    client_Nit?: string;
+    
+    subtotal?: number;
+    subtotal_Bruto?: number;
+    descuento_General?: number;
+    total_Iva?: number;
+    invoice_Total?: number;
+    invoice_Status?: string;
+    created_At?: Date;
+    
+    // Details
+    items?: InvoiceItem[];
+    customer?: InvoiceCustomer;
+    payments?: InvoicePayment[];
+    delivery?: InvoiceDelivery;
+}
+
+export interface InvoiceItem {
+    product_Id?: number;
+    reference?: string;
+    extension1?: string;
+    extension2?: string;
+    product_Sku?: string;
+    barcode?: string;
+    name?: string;
+    quantity?: number;
+    price?: number;
+    discount?: number;
+    discount_Value?: number;
+    subtotal?: number;
+    total?: number;
+}
+
+export interface InvoicePayment {
+    type?: string;
+    amount?: number;
+    months?: number;
+}
+
+export interface InvoiceDelivery {
+    address?: string;
+    city?: string;
+    state?: string;
+    zip_Code?: string;
+    phone?: string;
+    notes?: string;
+}
+
+export interface InvoiceCustomer {
+    document?: string;
+    nit?: string;
+    firstName?: string;
+    middleName?: string;
+    lastName?: string;
+    secondLastName?: string;
+    companyName?: string;
+    phone?: string;
+    isCompany: boolean;
+}
+```
+
+<Note>
+Invoice response fields use snake_case (e.g., `invoice_Number`) as they come directly from the database.
+</Note>
+
+## Inventory API Interfaces
+
+### Purchase Structure
+
+```typescript
+// src/app/components/pages/api/inventory.ts:9-76
+export interface GetPurchase {
+    purchaseId: number;
+    purchaseOrder?: string;
+    consecutive: number;
+    supplierNit: string;
+    supplier: string;
+    
+    supplierInvoice: string;
+    invoiceDate?: Date | string;
+    
+    subTotal: number;
+    total: number;
+    stateId: number;
+    state: string;
+    createdAt: Date | string;
+}
+
+export interface GetPurchaseDetail {
+    purchaseDetailId: number;
+    
+    sku: string;
+    barcode: string;
+    
+    reference: string;
+    extension1?: string;
+    extension2?: string;
+    
+    productName: string;
+    wareHouse: string;
+    
+    quantity: number;
+    unitPrice: number;
+    
+    subTotal: number;
+    tax: number;
+    total: number;
+}
+
+export interface PurchaseDetail {
+    productId?: number;
+    productName: string;
+    reference: string;
+    sku: number | string;
+    ean?: string;
+    ext1?: string;
+    ext2?: string;
+    quantity: number;
+    cost: number;
+    taxPercent: number;
+    total: number;
+    categoryId?: number | null | undefined;
+    unitMeasureId?: number | null | undefined;
+    warehouseId?: number | null | undefined;
+}
+
+export interface Purchase {
+    companiaId: number;
+    stateId: number | null;
+    purchaseOrder: string | null;
+    userId: number;
+    providerId: number | null;
+    invoiceNumber: string;
+    date: Date;
+    details: PurchaseDetail[];
+    subtotal: number;
+    tax: number;
+    total: number;
+}
+```
+
+### Stock Status Helper
+
+```typescript
+// src/app/components/pages/api/inventory.ts:3-7
+export interface StockStatus {
+    status: string;
+    severity: 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast';
+    tailwindClass: string;
+}
+```
+
+## Authentication API Interfaces
+
+### Login Session
+
+```typescript
+// src/app/components/pages/api/login.ts
+export interface AuthSession {
+    userId: number;
+    companiaId: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+    token?: string;
+}
+
+export interface ICompanySession {
+    companiaId: number;
+    compania: string;
+    nit: string;
+    rol: string;
+}
+```
+
+### Permissions
+
+```typescript
+// src/app/components/pages/api/permissions.ts
+export interface Permission {
+    module: string;
+    canView: boolean;
+    canCreate: boolean;
+    canEdit: boolean;
+    canDelete: boolean;
+    canExport: boolean;
+}
+
+export interface Role {
+    id: number;
+    name: string;
+    description?: string;
+    companiaId: number;
+}
+
+export interface User {
+    id: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+    roleId: number;
+    roleName?: string;
+    companiaId: number;
+}
+
+export interface Module {
+    id: number;
+    name: string;
+    description?: string;
+}
+```
+
+## API Base URLs
+
+All services use a centralized API URL:
+
+```typescript
+private apiUrl = 'https://localhost:7197/api/';
+```
+
+### Service Endpoints
+
+<Tabs>
+  <Tab title="Master Data">
+    ```
+    GET    /api/Master/GetCategories/{companiaId}
+    POST   /api/Master/CreateCategory
+    DELETE /api/Master/DeleteCategory
+    
+    GET    /api/Master/GetWarehouses/{companiaId}
+    POST   /api/Master/CreateWarehouse
+    DELETE /api/Master/DeleteWarehouse
+    
+    GET    /api/Master/GetClients/{companiaId}
+    POST   /api/Master/CreateClient
+    DELETE /api/Master/DeleteClient
+    
+    GET    /api/Master/GetSuppliers/{companiaId}
+    POST   /api/Master/CreateSupplier
+    DELETE /api/Master/DeleteSupplier
+    ```
+  </Tab>
+  
+  <Tab title="POS">
+    ```
+    POST   /api/pos/CreateInvoice
+    GET    /api/pos/GetInvoicesAll/{startDate}/{endDate}/{companyId}
+    GET    /api/pos/GetInvoiceDetail/{invoiceId}/{companyId}
+    GET    /api/pos/CancelInvoice/{invoiceId}/{companyId}
+    
+    POST   /api/pos/ValidateAndReserve
+    GET    /api/pos/CancelInvoiceAll/{facturaTempId}/{companiaId}
+    
+    GET    /api/pos/GetFinancings
+    GET    /api/pos/GetFinancingPayments
+    POST   /api/pos/AddPayment
+    POST   /api/pos/GenerateClearance
+    ```
+  </Tab>
+  
+  <Tab title="Inventory">
+    ```
+    GET    /api/Inventory/GetProducts/{companiaId}
+    POST   /api/Inventory/CreateProduct
+    POST   /api/Inventory/CreateProductBulk
+    DELETE /api/Inventory/DeleteProduct
+    
+    GET    /api/Inventory/GetPurchases/{companiaId}
+    POST   /api/Inventory/CreatePurchase
+    ```
+  </Tab>
+  
+  <Tab title="Permissions">
+    ```
+    GET    /api/Master/GetRoles/{companiaId}
+    POST   /api/Master/SaveRole
+    DELETE /api/Master/DeleteRole/{roleId}
+    
+    GET    /api/Master/GetModules
+    GET    /api/Master/GetRolePermissions/{roleId}
+    POST   /api/Master/SaveRolePermission
+    DELETE /api/Master/DeleteRolePermissions/{roleId}
+    ```
+  </Tab>
+</Tabs>
+
+## HTTP Client Configuration
+
+The app uses Angular's `HttpClient` with fetch API:
+
+```typescript
+// src/app.config.ts:16
+provideHttpClient(withFetch())
+```
+
+### HTTP Methods
+
+<CodeGroup>
+  ```typescript GET
+  getCategories(companiaId: number): Observable<ApiResponse<Category[]>> {
+      return this.http.get<ApiResponse<Category[]>>(
+          `${this.apiUrl}Master/GetCategories/${companiaId}`
+      );
+  }
+  ```
+  
+  ```typescript POST
+  createCategory(model: Category): Observable<ApiResponse<any>> {
+      return this.http.post<ApiResponse<any>>(
+          `${this.apiUrl}Master/CreateCategory`,
+          model
+      );
+  }
+  ```
+  
+  ```typescript DELETE (with body)
+  deleteCategory(model: Category): Observable<ApiResponse<any>> {
+      return this.http.request<ApiResponse<any>>(
+          'delete',
+          `${this.apiUrl}Master/DeleteCategory`,
+          { body: model }
+      );
+  }
+  ```
+  
+  ```typescript GET (with params)
+  getFinancingPayments(financingId: number): Observable<ApiResponse<GetFinancing[]>> {
+      const params = new HttpParams()
+          .set('option', 'get_payments')
+          .set('id', financingId);
+      return this.http.get<ApiResponse<GetFinancing[]>>(
+          `${this.apiUrl}pos/GetFinancingPayments`,
+          { params }
+      );
+  }
+  ```
+</CodeGroup>
+
+## Date Handling
+
+### Sending Dates to API
+
+```typescript
+getInvoices(
+    startDate: Date, 
+    endDate: Date, 
+    companyId: number
+): Observable<ApiResponse<IInvoiceClients[]>> {
+    return this.http.get<ApiResponse<IInvoiceClients[]>>(
+        `${this.apiUrl}pos/GetInvoicesAll/` +
+        `${startDate.toISOString()}/` +
+        `${endDate.toISOString()}/` +
+        `${companyId}`
+    );
+}
+```
+
+### Parsing Dates from API
+
+```typescript
+loadInvoices() {
+    this.posService.getInvoices(startDate, endDate, this.companiaId)
+        .subscribe({
+            next: (res) => {
+                this.invoices = res.data.map(inv => ({
+                    ...inv,
+                    created_At: new Date(inv.created_At!)
+                }));
+            }
+        });
+}
+```
+
+## Error Handling Patterns
+
+### Service-Level Error Handling
+
+```typescript
+loadCustomers() {
+    this.masterService.getClients(this.companiaId).subscribe({
+        next: (res) => {
+            if (res.code === 0) {
+                this.customers = res.data || [];
+            } else {
+                this.messageService.add({
+                    severity: 'warn',
+                    summary: 'Advertencia',
+                    detail: res.message || 'No se pudieron cargar los datos.'
+                });
+            }
+        },
+        error: (err) => {
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Error',
+                detail: 'Error de conexión con el servidor.'
+            });
+            console.error('API Error:', err);
+        }
+    });
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Type Everything" icon="code">
+    Always define TypeScript interfaces for requests and responses
+  </Card>
+  <Card title="Generic Response" icon="box">
+    Use `ApiResponse<T>` wrapper for consistent error handling
+  </Card>
+  <Card title="Null Safety" icon="shield">
+    Use optional chaining and nullish coalescing (`?.`, `??`)
+  </Card>
+  <Card title="Loading States" icon="spinner">
+    Show loading indicators during API calls
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="State Management" icon="database" href="/components/state-management">
+    Learn about state management patterns
+  </Card>
+  <Card title="Services" icon="code" href="/components/services">
+    Explore service layer patterns
+  </Card>
+</CardGroup>

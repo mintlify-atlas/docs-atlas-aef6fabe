@@ -1,0 +1,613 @@
+---
+title: Testing Guide
+description: Unit testing setup with Karma and Jasmine for Angular components
+---
+
+## Overview
+
+The application uses the Angular testing framework with:
+
+- **Jasmine** - Testing framework
+- **Karma** - Test runner
+- **Angular Testing Utilities** - Component testing helpers
+
+## Testing Configuration
+
+### Karma Configuration
+
+The test runner is configured through Angular's build system:
+
+**Location**: `angular.json`
+
+```json
+{
+    "test": {
+        "builder": "@angular-devkit/build-angular:karma",
+        "options": {
+            "polyfills": [
+                "zone.js",
+                "zone.js/testing"
+            ],
+            "tsConfig": "tsconfig.spec.json",
+            "inlineStyleLanguage": "scss",
+            "assets": [
+                {
+                    "glob": "**/*",
+                    "input": "public"
+                }
+            ],
+            "styles": [
+                "src/styles.scss"
+            ],
+            "scripts": []
+        }
+    }
+}
+```
+
+### TypeScript Test Configuration
+
+**Location**: `tsconfig.spec.json`
+
+```json
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "outDir": "./out-tsc/spec",
+        "types": [
+            "jasmine"
+        ]
+    },
+    "include": [
+        "src/**/*.spec.ts",
+        "src/**/*.d.ts"
+    ]
+}
+```
+
+### Dependencies
+
+From `package.json`:
+
+```json
+{
+    "devDependencies": {
+        "@types/jasmine": "~5.1.0",
+        "jasmine-core": "~5.4.0",
+        "karma": "~6.4.0",
+        "karma-chrome-launcher": "~3.2.0",
+        "karma-coverage": "~2.2.0",
+        "karma-jasmine": "~5.1.0",
+        "karma-jasmine-html-reporter": "~2.1.0"
+    }
+}
+```
+
+## Running Tests
+
+### Execute All Tests
+
+```bash
+npm test
+```
+
+This runs `ng test` which:
+- Compiles the application
+- Launches Karma test runner
+- Opens Chrome browser
+- Runs all `*.spec.ts` files
+- Watches for file changes
+
+### Single Run (CI/CD)
+
+```bash
+ng test --watch=false --browsers=ChromeHeadless
+```
+
+### Code Coverage
+
+```bash
+ng test --code-coverage
+```
+
+Coverage reports are generated in the `coverage/` directory.
+
+## Test File Structure
+
+Test files follow the naming convention: `*.spec.ts`
+
+### Standard Component Test
+
+**Location**: `src/app/components/pages/agents/agents.component.spec.ts`
+
+<CodeGroup>
+```typescript agents.component.spec.ts
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { AgentsComponent } from './agents.component';
+
+describe('AgentsComponent', () => {
+    let component: AgentsComponent;
+    let fixture: ComponentFixture<AgentsComponent>;
+
+    beforeEach(async () => {
+        await TestBed.configureTestingModule({
+            imports: [AgentsComponent]
+        })
+        .compileComponents();
+
+        fixture = TestBed.createComponent(AgentsComponent);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+    });
+
+    it('should create', () => {
+        expect(component).toBeTruthy();
+    });
+});
+```
+</CodeGroup>
+
+## Writing Component Tests
+
+### Basic Component Test
+
+```typescript
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { CustomersComponent } from './customers.component';
+
+describe('CustomersComponent', () => {
+    let component: CustomersComponent;
+    let fixture: ComponentFixture<CustomersComponent>;
+
+    beforeEach(async () => {
+        await TestBed.configureTestingModule({
+            imports: [CustomersComponent]
+        }).compileComponents();
+
+        fixture = TestBed.createComponent(CustomersComponent);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+    });
+
+    it('should create the component', () => {
+        expect(component).toBeTruthy();
+    });
+
+    it('should initialize with empty customers array', () => {
+        expect(component.customers).toEqual([]);
+        expect(component.customers.length).toBe(0);
+    });
+
+    it('should set isLoading to false initially', () => {
+        expect(component.isLoading).toBeFalse();
+    });
+});
+```
+
+### Testing with Dependencies
+
+```typescript
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { MessageService } from 'primeng/api';
+import { AgentsComponent } from './agents.component';
+import { MasterService } from '../../services/master.service';
+import { WhatsappService } from '../../services/whatsapp.service';
+
+describe('AgentsComponent', () => {
+    let component: AgentsComponent;
+    let fixture: ComponentFixture<AgentsComponent>;
+    let masterService: jasmine.SpyObj<MasterService>;
+    let whatsappService: jasmine.SpyObj<WhatsappService>;
+
+    beforeEach(async () => {
+        const masterServiceSpy = jasmine.createSpyObj('MasterService', ['getUsers']);
+        const whatsappServiceSpy = jasmine.createSpyObj('WhatsappService', [
+            'getByPhoneNumbers',
+            'getAgents',
+            'assignAgent'
+        ]);
+
+        await TestBed.configureTestingModule({
+            imports: [
+                AgentsComponent,
+                HttpClientTestingModule
+            ],
+            providers: [
+                MessageService,
+                { provide: MasterService, useValue: masterServiceSpy },
+                { provide: WhatsappService, useValue: whatsappServiceSpy }
+            ]
+        }).compileComponents();
+
+        fixture = TestBed.createComponent(AgentsComponent);
+        component = fixture.componentInstance;
+        masterService = TestBed.inject(MasterService) as jasmine.SpyObj<MasterService>;
+        whatsappService = TestBed.inject(WhatsappService) as jasmine.SpyObj<WhatsappService>;
+    });
+
+    it('should create', () => {
+        expect(component).toBeTruthy();
+    });
+});
+```
+
+### Testing Methods
+
+```typescript
+import { of, throwError } from 'rxjs';
+
+describe('AgentsComponent Methods', () => {
+    it('should load agents successfully', () => {
+        const mockResponse = {
+            code: 0,
+            data: [
+                { id: 1, name: 'Agent 1' },
+                { id: 2, name: 'Agent 2' }
+            ]
+        };
+
+        whatsappService.getAgents.and.returnValue(of(mockResponse));
+        component.selectedConfigId = 1;
+
+        component.fetchAssignedAgents();
+
+        expect(component.assignedAgents.length).toBe(2);
+        expect(component.isLoading).toBeFalse();
+    });
+
+    it('should handle error when loading agents fails', () => {
+        whatsappService.getAgents.and.returnValue(
+            throwError(() => new Error('API Error'))
+        );
+        component.selectedConfigId = 1;
+
+        component.fetchAssignedAgents();
+
+        expect(component.assignedAgents).toEqual([]);
+        expect(component.isLoading).toBeFalse();
+    });
+});
+```
+
+### Testing User Interactions
+
+```typescript
+describe('AgentsComponent User Interactions', () => {
+    it('should open assign modal when button clicked', () => {
+        expect(component.isAssignModalVisible).toBeFalse();
+
+        component.openAssignModal();
+
+        expect(component.isAssignModalVisible).toBeTrue();
+        expect(component.assignmentForm.agentId).toBeNull();
+    });
+
+    it('should assign agent when form submitted', () => {
+        const mockResponse = { code: 0, message: 'Success' };
+
+        whatsappService.assignAgent.and.returnValue(of(mockResponse));
+        component.selectedConfigId = 1;
+        component.assignmentForm.agentId = 123;
+        component.assignmentForm.priority = 1;
+
+        component.onAssignAgent();
+
+        expect(whatsappService.assignAgent).toHaveBeenCalled();
+        expect(component.isAssignModalVisible).toBeFalse();
+    });
+});
+```
+
+## Testing Services
+
+### Service Test Example
+
+```typescript
+import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { MasterService } from './master.service';
+import { User } from '../api/permissions';
+
+describe('MasterService', () => {
+    let service: MasterService;
+    let httpMock: HttpTestingController;
+
+    beforeEach(() => {
+        TestBed.configureTestingModule({
+            imports: [HttpClientTestingModule],
+            providers: [MasterService]
+        });
+
+        service = TestBed.inject(MasterService);
+        httpMock = TestBed.inject(HttpTestingController);
+    });
+
+    afterEach(() => {
+        httpMock.verify();
+    });
+
+    it('should be created', () => {
+        expect(service).toBeTruthy();
+    });
+
+    it('should fetch users', () => {
+        const mockUsers: User[] = [
+            { userId: 1, username: 'user1', email: 'user1@example.com' },
+            { userId: 2, username: 'user2', email: 'user2@example.com' }
+        ];
+        const companiaId = 1;
+
+        service.getUsers(companiaId).subscribe(users => {
+            expect(users.length).toBe(2);
+            expect(users).toEqual(mockUsers);
+        });
+
+        const req = httpMock.expectOne(`${service.apiUrl}/users/${companiaId}`);
+        expect(req.request.method).toBe('GET');
+        req.flush(mockUsers);
+    });
+
+    it('should handle error when fetching users fails', () => {
+        const companiaId = 1;
+        const errorMessage = 'Failed to load users';
+
+        service.getUsers(companiaId).subscribe(
+            () => fail('should have failed'),
+            (error) => {
+                expect(error.status).toBe(500);
+            }
+        );
+
+        const req = httpMock.expectOne(`${service.apiUrl}/users/${companiaId}`);
+        req.flush(errorMessage, { status: 500, statusText: 'Server Error' });
+    });
+});
+```
+
+## Testing Standalone Components
+
+For Angular 19 standalone components:
+
+```typescript
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { ButtonModule } from 'primeng/button';
+import { ExampleComponent } from './example.component';
+
+describe('ExampleComponent (Standalone)', () => {
+    let component: ExampleComponent;
+    let fixture: ComponentFixture<ExampleComponent>;
+
+    beforeEach(async () => {
+        await TestBed.configureTestingModule({
+            imports: [
+                ExampleComponent,  // Import the standalone component
+                CommonModule,
+                FormsModule,
+                ButtonModule
+            ]
+        }).compileComponents();
+
+        fixture = TestBed.createComponent(ExampleComponent);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+    });
+
+    it('should create', () => {
+        expect(component).toBeTruthy();
+    });
+});
+```
+
+## Testing Permissions
+
+```typescript
+describe('Permissions', () => {
+    beforeEach(() => {
+        component.permissions = [
+            {
+                module: 'Agentes',
+                canView: true,
+                canCreate: true,
+                canEdit: false,
+                canDelete: false,
+                canExport: true
+            }
+        ];
+    });
+
+    it('should apply permissions correctly', () => {
+        component['applyPermissions']();
+
+        expect(component.canView).toBeTrue();
+        expect(component.canCreate).toBeTrue();
+        expect(component.canEdit).toBeFalse();
+        expect(component.canDelete).toBeFalse();
+        expect(component.canExport).toBeTrue();
+    });
+
+    it('should reset permissions when module not found', () => {
+        component.permissions = [
+            { module: 'OtherModule', canView: true, canCreate: true }
+        ];
+
+        component['applyPermissions']();
+
+        expect(component.canView).toBeFalse();
+        expect(component.canCreate).toBeFalse();
+    });
+});
+```
+
+## Jasmine Matchers
+
+### Common Matchers
+
+```typescript
+// Equality
+expect(value).toBe(expected);           // ===
+expect(value).toEqual(expected);        // Deep equality
+expect(value).toBeTruthy();             // Truthy
+expect(value).toBeFalsy();              // Falsy
+expect(value).toBeNull();               // null
+expect(value).toBeUndefined();          // undefined
+expect(value).toBeDefined();            // defined
+
+// Numerical
+expect(value).toBeGreaterThan(3);
+expect(value).toBeLessThan(5);
+expect(value).toBeCloseTo(4.2, 1);      // Precision
+
+// Strings
+expect(string).toContain('substring');
+expect(string).toMatch(/pattern/);
+
+// Arrays
+expect(array).toContain(item);
+expect(array.length).toBe(5);
+
+// Objects
+expect(obj).toHaveProperty('key');
+expect(obj.key).toBe('value');
+
+// Functions
+expect(fn).toThrow();
+expect(fn).toHaveBeenCalled();
+expect(fn).toHaveBeenCalledWith(arg1, arg2);
+expect(fn).toHaveBeenCalledTimes(3);
+```
+
+## Test Organization
+
+### Describe Blocks
+
+```typescript
+describe('CustomersComponent', () => {
+    describe('Initialization', () => {
+        it('should create component', () => { });
+        it('should initialize with default values', () => { });
+    });
+
+    describe('Data Loading', () => {
+        it('should load customers on init', () => { });
+        it('should handle loading errors', () => { });
+    });
+
+    describe('User Interactions', () => {
+        it('should open edit modal', () => { });
+        it('should save customer', () => { });
+    });
+
+    describe('Permissions', () => {
+        it('should apply permissions', () => { });
+        it('should disable buttons when no edit permission', () => { });
+    });
+});
+```
+
+## Mock Data
+
+Create reusable mock data:
+
+```typescript
+// test-helpers/mock-data.ts
+export const mockUsers: User[] = [
+    {
+        userId: 1,
+        username: 'john',
+        email: 'john@example.com',
+        role: 'admin',
+        isActive: true
+    },
+    {
+        userId: 2,
+        username: 'jane',
+        email: 'jane@example.com',
+        role: 'user',
+        isActive: true
+    }
+];
+
+export const mockApiResponse = <T>(data: T) => ({
+    code: 0,
+    message: 'Success',
+    data
+});
+
+// Use in tests
+import { mockUsers, mockApiResponse } from '../test-helpers/mock-data';
+
+service.getUsers(1).subscribe(response => {
+    expect(response).toEqual(mockApiResponse(mockUsers));
+});
+```
+
+## Best Practices
+
+<Tip>
+**Testing Guidelines**
+- Write tests for all components and services
+- Test both success and error scenarios
+- Use descriptive test names
+- Keep tests isolated and independent
+- Mock external dependencies
+- Test user interactions
+- Verify permissions are checked
+</Tip>
+
+<Warning>
+**Common Testing Mistakes**
+- Don't test framework code (Angular internals)
+- Don't forget to call `fixture.detectChanges()`
+- Don't use real HTTP calls - use mocks
+- Don't test implementation details
+- Don't forget to verify HTTP mocks with `httpMock.verify()`
+</Warning>
+
+## Code Coverage
+
+### Generate Coverage Report
+
+```bash
+ng test --code-coverage --watch=false
+```
+
+### View Coverage Report
+
+Open `coverage/index.html` in a browser.
+
+### Coverage Goals
+
+- **Statements**: > 80%
+- **Branches**: > 75%
+- **Functions**: > 80%
+- **Lines**: > 80%
+
+## Debugging Tests
+
+### Chrome DevTools
+
+1. Run `ng test`
+2. Click "DEBUG" button in Karma browser
+3. Open Chrome DevTools (F12)
+4. Set breakpoints in the Sources tab
+5. Refresh the page to hit breakpoints
+
+### Console Logging
+
+```typescript
+it('should debug test', () => {
+    console.log('Component state:', component);
+    console.log('Service response:', response);
+    
+    expect(component).toBeTruthy();
+});
+```
+
+## Next Steps
+
+- Review [Build & Deployment](/development/deployment)
+- Understand [Code Standards](/development/code-standards)
+- Learn about [Application Architecture](/development/architecture)

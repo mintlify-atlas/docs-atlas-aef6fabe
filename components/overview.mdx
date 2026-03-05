@@ -1,0 +1,252 @@
+---
+title: 'Component Architecture Overview'
+description: 'Comprehensive overview of the Angular 19 + PrimeNG component architecture in the POS application'
+---
+
+## Introduction
+
+This POS (Point of Sale) application is built with **Angular 19** using a modern **standalone component architecture**. The UI layer leverages **PrimeNG 19** for enterprise-grade components and **TailwindCSS** for utility-first styling.
+
+## Tech Stack
+
+<CardGroup cols={2}>
+  <Card title="Angular 19" icon="angular">
+    Latest Angular with standalone components, signals, and computed properties
+  </Card>
+  <Card title="PrimeNG 19.0.8" icon="layer-group">
+    Complete UI component library with Aura theme preset
+  </Card>
+  <Card title="TailwindCSS" icon="palette">
+    Utility-first CSS with custom PrimeUI integration
+  </Card>
+  <Card title="RxJS 7.8" icon="arrows-spin">
+    Reactive programming with Observables for state management
+  </Card>
+</CardGroup>
+
+## Architecture Principles
+
+### Standalone Components
+
+All components use Angular's standalone architecture (no NgModules):
+
+```typescript
+// src/app/components/pages/inventory/inventory.component.ts:31-37
+@Component({
+    selector: 'app-inventory',
+    standalone: true,
+    imports: [CommonModule, FormsModule, ButtonModule, InputTextModule, 
+              InputNumberModule, DropdownModule, DialogModule, TableModule, 
+              ToggleSwitchModule, ToastModule],
+    templateUrl: './inventory.component.html',
+    providers: [MessageService]
+})
+export class InventoryComponent implements OnInit { ... }
+```
+
+<Note>
+Standalone components reduce bundle size and improve tree-shaking by importing only what's needed.
+</Note>
+
+### Application Bootstrap
+
+The application bootstraps using the modern `bootstrapApplication` API:
+
+```typescript
+// src/main.ts:1-5
+import { bootstrapApplication } from '@angular/platform-browser';
+import { appConfig } from './app.config';
+import { AppComponent } from './app.component';
+
+bootstrapApplication(AppComponent, appConfig)
+    .catch((err) => console.error(err));
+```
+
+### Application Configuration
+
+```typescript
+// src/app.config.ts:13-23
+export const appConfig: ApplicationConfig = {
+    providers: [
+        provideRouter(appRoutes, 
+            withInMemoryScrolling({ 
+                anchorScrolling: 'enabled', 
+                scrollPositionRestoration: 'enabled' 
+            }),
+            withEnabledBlockingInitialNavigation()
+        ),
+        provideHttpClient(withFetch()),
+        provideAnimationsAsync(),
+        providePrimeNG({
+            theme: { 
+                preset: Aura, 
+                options: { darkModeSelector: '.app-dark' } 
+            }
+        }),
+        { provide: LOCALE_ID, useValue: 'es-CO' }
+    ]
+};
+```
+
+<Tip>
+The app uses Colombian locale (es-CO) for currency and date formatting.
+</Tip>
+
+## PrimeNG Integration
+
+### Theme Configuration
+
+The application uses PrimeNG's **Aura** preset with dark mode support:
+
+```typescript
+providePrimeNG({
+    theme: { 
+        preset: Aura, 
+        options: { darkModeSelector: '.app-dark' } 
+    }
+})
+```
+
+### Common PrimeNG Components Used
+
+- **Data Display**: `TableModule`, `CardModule`
+- **Forms**: `InputTextModule`, `InputNumberModule`, `DropdownModule`, `ToggleSwitchModule`
+- **Dialogs**: `DialogModule`, `ToastModule`
+- **Buttons**: `ButtonModule`, `RippleModule`
+- **Utilities**: `StyleClassModule`
+
+## Project Structure
+
+```
+src/app/
+├── components/
+│   ├── auth/                    # Authentication components
+│   ├── pages/                   # Feature pages
+│   │   ├── api/                # API interfaces & types
+│   │   ├── core/               # Core services (guards, auth)
+│   │   ├── services/           # Business logic services
+│   │   ├── inventory/          # Inventory management
+│   │   ├── master/             # Master data (customers, categories)
+│   │   ├── cash/               # Cash register
+│   │   └── ...
+│   └── ...
+├── layout/
+│   ├── component/              # Layout components
+│   │   ├── app.layout.ts      # Main layout wrapper
+│   │   ├── app.topbar.ts      # Top navigation bar
+│   │   ├── app.menu.ts        # Sidebar menu
+│   │   └── app.sidebar.ts     # Sidebar container
+│   └── service/
+│       └── layout.service.ts  # Layout state management
+└── app.component.ts            # Root component
+```
+
+## State Management
+
+### Signals & Computed Properties
+
+Angular 19 signals are used for reactive state:
+
+```typescript
+// src/app/layout/service/layout.service.ts:45-74
+layoutConfig = signal<layoutConfig>(this._config);
+layoutState = signal<LayoutState>(this._state);
+
+// Computed properties
+theme = computed(() => 
+    this.layoutConfig()?.darkTheme ? 'light' : 'dark'
+);
+
+isSidebarActive = computed(() => 
+    this.layoutState().overlayMenuActive || 
+    this.layoutState().staticMenuMobileActive
+);
+
+isDarkTheme = computed(() => this.layoutConfig().darkTheme);
+
+getPrimary = computed(() => this.layoutConfig().primary);
+```
+
+### RxJS Observables
+
+Services use RxJS for asynchronous operations:
+
+```typescript
+// src/app/layout/service/layout.service.ts:49-63
+private configUpdate = new Subject<layoutConfig>();
+private overlayOpen = new Subject<any>();
+private menuSource = new Subject<MenuChangeEvent>();
+private resetSource = new Subject();
+
+menuSource$ = this.menuSource.asObservable();
+resetSource$ = this.resetSource.asObservable();
+configUpdate$ = this.configUpdate.asObservable();
+overlayOpen$ = this.overlayOpen.asObservable();
+```
+
+## Styling Approach
+
+### TailwindCSS + Custom Styles
+
+The application combines TailwindCSS utilities with component-scoped styles:
+
+```typescript
+// Inline template with Tailwind classes
+template: `
+    <div class="flex items-center gap-6">
+        <button class="lg:hidden p-2.5 hover:bg-slate-100 
+                       rounded-xl transition-all duration-200 
+                       active:scale-95" 
+                (click)="layoutService.onMenuToggle()">
+            <i class="pi pi-bars text-xl text-slate-600"></i>
+        </button>
+    </div>
+`
+```
+
+### Dark Mode Support
+
+Dark mode is implemented using CSS classes and signals:
+
+```typescript
+// src/app/layout/service/layout.service.ts:122-129
+toggleDarkMode(config?: layoutConfig): void {
+    const _config = config || this.layoutConfig();
+    if (_config.darkTheme) {
+        document.documentElement.classList.add('app-dark');
+    } else {
+        document.documentElement.classList.remove('app-dark');
+    }
+}
+```
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Permission-Based UI" icon="shield-halved">
+    Components check user permissions before rendering actions
+  </Card>
+  <Card title="Responsive Design" icon="mobile-screen">
+    Mobile-first approach with adaptive layouts
+  </Card>
+  <Card title="Real-time Updates" icon="rotate">
+    RxJS observables for live data synchronization
+  </Card>
+  <Card title="Internationalization" icon="globe">
+    Colombian locale support (es-CO) for numbers and dates
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Layout Components" icon="table-columns" href="/components/layout">
+    Explore the layout architecture
+  </Card>
+  <Card title="Forms" icon="list-check" href="/components/forms">
+    Learn form patterns and validation
+  </Card>
+  <Card title="Services" icon="code" href="/components/services">
+    Understand service architecture
+  </Card>
+</CardGroup>

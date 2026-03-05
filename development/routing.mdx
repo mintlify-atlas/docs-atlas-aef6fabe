@@ -1,0 +1,398 @@
+---
+title: Routing Configuration
+description: Understanding the Angular routing setup and navigation structure
+---
+
+## Overview
+
+The application uses Angular's standalone routing system with lazy-loaded feature modules and route guards for authentication.
+
+## Route Structure
+
+The routing is organized in a hierarchical structure:
+
+```
+app.routes.ts (Root)
+├── '' → AppLayout (Protected)
+│   └── 'pages' → pages.routes.ts (Lazy)
+├── 'setup' → InitialSetupComponent
+├── 'login' → Login
+├── 'notfound' → Notfound
+└── '**' → Redirect to /notfound
+```
+
+## Root Routes
+
+The main application routes are defined in `src/app.routes.ts`:
+
+<CodeGroup>
+```typescript app.routes.ts
+import { Routes } from '@angular/router';
+import { AppLayout } from './app/layout/component/app.layout';
+import { Notfound } from './app/components/notfound/notfound';
+import { Login } from './app/components/auth/login';
+import { InitialSetupComponent } from './app/components/pages/master/initial-setup/initial-setup.component';
+import { authGuard } from './app/components/pages/core/guards/auth.guard';
+
+export const appRoutes: Routes = [
+    {
+        path: '',
+        component: AppLayout,
+        canActivate: [authGuard],
+        children: [
+            { 
+                path: 'pages', 
+                loadChildren: () => import('./app/components/pages/pages.routes') 
+            }
+        ]
+    },
+    { path: 'setup', component: InitialSetupComponent },
+    { path: 'notfound', component: Notfound },
+    { path: 'login', component: Login },
+    { path: '**', redirectTo: '/notfound' }
+];
+```
+</CodeGroup>
+
+**File Location**: `src/app.routes.ts`
+
+### Key Features
+
+- **Protected Routes**: Root path uses `authGuard` for authentication
+- **Lazy Loading**: Pages are lazy-loaded for performance
+- **Wildcard Route**: Catches undefined routes and redirects to 404
+- **Public Routes**: Login and setup are accessible without authentication
+
+## Authentication Guard
+
+The `authGuard` protects routes requiring authentication:
+
+```typescript
+import { authGuard } from './app/components/pages/core/guards/auth.guard';
+
+{
+    path: '',
+    component: AppLayout,
+    canActivate: [authGuard],  // Requires authentication
+    children: [...]
+}
+```
+
+**Location**: `src/app/components/pages/core/guards/auth.guard.ts`
+
+<Tip>
+The auth guard checks for valid session data before allowing access to protected routes. Unauthenticated users are redirected to the login page.
+</Tip>
+
+## Feature Routes (Pages)
+
+The main application features are defined in `src/app/components/pages/pages.routes.ts`:
+
+```typescript
+import { Routes } from '@angular/router';
+
+export default [
+    // Master Data
+    { path: 'settings', component: SettingsComponent },
+    { path: 'customers', component: CustomersComponent },
+    { path: 'suppliers', component: SuppliersComponent },
+    { path: 'category', component: CategorysComponent },
+    { path: 'warehouse', component: WarehousesComponent },
+    { path: 'company', component: CompanyComponent },
+    { path: 'permissions', component: PermissionsModuleComponent },
+    
+    // Operations
+    { path: 'pos', component: PosComponent },
+    { path: 'cash-module', component: CashComponent },
+    { path: 'cash-register', component: CashRegisterComponent },
+    { path: 'inventory', component: InventoryComponent },
+    { path: 'low-stock', component: LowStockComponent },
+    
+    // Sales & Finance
+    { path: 'invoices', component: InvoicesComponent },
+    { path: 'quotes', component: QuotesComponent },
+    { path: 'financing', component: FinancingComponent },
+    { path: 'promotions', component: PromotionsComponent },
+    { path: 'purchases', component: PurchaseComponent },
+    
+    // Reports & Analytics
+    { path: 'reports', component: ReportsComponent },
+    
+    // Integrations
+    { path: 'whatsapp-chats', component: WhatsappMultiagentComponent },
+    { path: 'agents', component: AgentsComponent },
+    
+    // Utilities
+    { path: 'empty', component: Empty }
+] as Routes;
+```
+
+**File Location**: `src/app/components/pages/pages.routes.ts`
+
+## Route Paths
+
+All feature routes are prefixed with `/pages/`:
+
+| Route | Full Path | Component |
+|-------|-----------|----------|
+| POS | `/pages/pos` | PosComponent |
+| Inventory | `/pages/inventory` | InventoryComponent |
+| Customers | `/pages/customers` | CustomersComponent |
+| Invoices | `/pages/invoices` | InvoicesComponent |
+| Reports | `/pages/reports` | ReportsComponent |
+| Settings | `/pages/settings` | SettingsComponent |
+| Cash Register | `/pages/cash-register` | CashRegisterComponent |
+| Financing | `/pages/financing` | FinancingComponent |
+| Agents | `/pages/agents` | AgentsComponent |
+
+## Authentication Routes
+
+Authentication-related routes are defined in `src/app/components/auth/auth.routes.ts`:
+
+```typescript
+import { Routes } from '@angular/router';
+import { Access } from './access';
+import { Login } from './login';
+import { Error } from './error';
+
+export default [
+    { path: 'access', component: Access },
+    { path: 'error', component: Error },
+    { path: 'login', component: Login }
+] as Routes;
+```
+
+**File Location**: `src/app/components/auth/auth.routes.ts`
+
+<Warning>
+These routes are currently commented out in the main routes. To use them, uncomment the auth routes lazy loading in `app.routes.ts`.
+</Warning>
+
+## Lazy Loading
+
+### Benefits
+
+- **Faster Initial Load**: Only load code when needed
+- **Better Performance**: Smaller initial bundle size
+- **Code Splitting**: Automatic bundle optimization
+
+### Implementation
+
+Lazy loading is implemented using dynamic imports:
+
+```typescript
+{
+    path: 'pages',
+    loadChildren: () => import('./app/components/pages/pages.routes')
+}
+```
+
+Angular automatically:
+1. Creates a separate chunk for the routes
+2. Loads the chunk when the route is accessed
+3. Caches the chunk for subsequent visits
+
+## Navigation
+
+### Programmatic Navigation
+
+Navigate using the Router service:
+
+```typescript
+import { Router } from '@angular/router';
+
+export class ExampleComponent {
+    constructor(private router: Router) {}
+    
+    navigateToCustomers(): void {
+        this.router.navigate(['/pages/customers']);
+    }
+    
+    navigateWithParams(): void {
+        this.router.navigate(['/pages/inventory'], {
+            queryParams: { filter: 'low-stock' }
+        });
+    }
+}
+```
+
+### Template Navigation
+
+Use `routerLink` directive in templates:
+
+```html
+<!-- Simple navigation -->
+<a routerLink="/pages/pos">Point of Sale</a>
+
+<!-- With active class -->
+<a 
+    routerLink="/pages/customers" 
+    routerLinkActive="active"
+    [routerLinkActiveOptions]="{ exact: true }">
+    Customers
+</a>
+
+<!-- With parameters -->
+<a [routerLink]="['/pages/inventory', item.id]">View Item</a>
+```
+
+## Route Guards
+
+### Auth Guard Implementation
+
+Route guards control access to routes:
+
+```typescript
+import { inject } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from '../auth.service';
+
+export const authGuard = () => {
+    const authService = inject(AuthService);
+    const router = inject(Router);
+    
+    const session = authService.getSession();
+    
+    if (!session) {
+        router.navigate(['/login']);
+        return false;
+    }
+    
+    return true;
+};
+```
+
+### Using Guards
+
+Apply guards to routes:
+
+```typescript
+{
+    path: 'admin',
+    component: AdminComponent,
+    canActivate: [authGuard, adminGuard]
+}
+```
+
+## Route Parameters
+
+### Accessing Route Params
+
+```typescript
+import { ActivatedRoute } from '@angular/router';
+
+export class DetailComponent implements OnInit {
+    constructor(private route: ActivatedRoute) {}
+    
+    ngOnInit(): void {
+        // Get route parameter
+        const id = this.route.snapshot.paramMap.get('id');
+        
+        // Subscribe to param changes
+        this.route.paramMap.subscribe(params => {
+            const id = params.get('id');
+            this.loadData(id);
+        });
+        
+        // Get query parameters
+        this.route.queryParams.subscribe(params => {
+            const filter = params['filter'];
+        });
+    }
+}
+```
+
+## Route Configuration
+
+### Adding New Routes
+
+<Steps>
+  <Step title="Create Component">
+    Generate a new standalone component:
+    
+    ```bash
+    ng generate component components/pages/my-feature --standalone
+    ```
+  </Step>
+
+  <Step title="Add Route">
+    Add the route to `pages.routes.ts`:
+    
+    ```typescript
+    import { MyFeatureComponent } from './my-feature/my-feature.component';
+    
+    export default [
+        // ... existing routes
+        { path: 'my-feature', component: MyFeatureComponent }
+    ] as Routes;
+    ```
+  </Step>
+
+  <Step title="Add Navigation">
+    Update the sidebar menu in the layout component.
+  </Step>
+</Steps>
+
+## Route Resolver
+
+Preload data before activating a route:
+
+```typescript
+import { ResolveFn } from '@angular/router';
+import { inject } from '@angular/core';
+import { MasterService } from '../services/master.service';
+
+export const customersResolver: ResolveFn<any> = (route, state) => {
+    const service = inject(MasterService);
+    const companiaId = route.paramMap.get('id');
+    return service.getCustomers(companiaId);
+};
+
+// Use in route
+{
+    path: 'customers/:id',
+    component: CustomersComponent,
+    resolve: { customers: customersResolver }
+}
+```
+
+## Child Routes
+
+Nested routing for complex features:
+
+```typescript
+{
+    path: 'pos',
+    component: PosComponent,
+    children: [
+        { path: 'cart', component: ShoppingCartComponent },
+        { path: 'payment', component: PaymentDialogComponent },
+        { path: 'invoice', component: InvoiceDialogComponent }
+    ]
+}
+```
+
+## Best Practices
+
+<Tip>
+**Routing Tips**
+- Use lazy loading for feature modules
+- Implement guards for protected routes
+- Keep route paths lowercase and hyphenated
+- Use meaningful route names that reflect the feature
+- Implement proper error handling for failed navigation
+</Tip>
+
+<Warning>
+**Avoid Common Mistakes**
+- Don't hardcode URLs - use route parameters
+- Don't forget to unsubscribe from route observables
+- Don't mix route styles (absolute vs relative)
+- Always handle navigation failures
+</Warning>
+
+## Next Steps
+
+- Review [Application Architecture](/development/architecture)
+- Learn about [Styling System](/development/styling)
+- Understand [Code Standards](/development/code-standards)

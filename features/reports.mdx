@@ -1,0 +1,485 @@
+---
+title: 'Sales Reports & Analytics'
+description: 'Generate comprehensive sales reports and analytics dashboards'
+icon: 'chart-line'
+---
+
+# Sales Reports & Analytics
+
+The reports module provides real-time sales analytics and performance metrics. Generate comprehensive reports by different time periods and analyze sales trends, top products, and category performance.
+
+## Business Value
+
+<CardGroup cols={2}>
+  <Card title="Real-time Insights" icon="gauge">
+    Monitor sales performance in real-time across different periods
+  </Card>
+  <Card title="Product Analytics" icon="box">
+    Identify top-selling products and growth trends
+  </Card>
+  <Card title="Category Breakdown" icon="layer-group">
+    Analyze sales distribution across product categories
+  </Card>
+  <Card title="Customer Metrics" icon="users">
+    Track customer count and average ticket size
+  </Card>
+</CardGroup>
+
+## Key Metrics
+
+The reports component tracks the following metrics:
+
+### Sales Period Data
+
+```typescript
+export interface SalesPeriodData {
+  sales: number;        // Total sales amount
+  transactions: number; // Number of transactions
+  customers: number;    // Unique customers
+  avgTicket: number;    // Average transaction value
+}
+
+export interface SalesDataCollection {
+  today: SalesPeriodData;
+  week: SalesPeriodData;
+  month: SalesPeriodData;
+}
+```
+
+### Top Products Tracking
+
+```typescript
+export interface TopProduct {
+  name: string;     // Product name
+  sales: number;    // Units sold
+  revenue: number;  // Total revenue
+  growth: number;   // Growth percentage
+}
+```
+
+### Category Sales Analysis
+
+```typescript
+export interface CategorySales {
+  category: string;   // Category name
+  amount: number;     // Total sales amount
+  percentage: number; // Percentage of total sales
+  color: string;      // Visual indicator color
+}
+```
+
+## Implementation
+
+### Component Setup
+
+```typescript
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { ButtonModule } from 'primeng/button';
+import { CardModule } from 'primeng/card';
+import { DropdownModule } from 'primeng/dropdown';
+import { TableModule } from 'primeng/table';
+import { TagModule } from 'primeng/tag';
+
+@Component({
+  selector: 'app-reports',
+  imports: [
+    CommonModule,
+    FormsModule,
+    CardModule,
+    ButtonModule,
+    DropdownModule,
+    TableModule,
+    TagModule,
+  ],
+  templateUrl: './reports.component.html',
+  styleUrl: './reports.component.scss'
+})
+export class ReportsComponent implements OnInit {
+  selectedPeriod: string = 'today';
+  
+  periodOptions = [
+    { label: 'Hoy', value: 'today' },
+    { label: 'Esta Semana', value: 'week' },
+    { label: 'Este Mes', value: 'month' },
+  ];
+  
+  // ... data properties
+}
+```
+
+## Period-based Reporting
+
+<Tabs>
+  <Tab title="Today">
+    View today's sales performance:
+    
+    ```typescript
+    {
+      sales: 1247.5,
+      transactions: 47,
+      customers: 32,
+      avgTicket: 26.54
+    }
+    ```
+  </Tab>
+  
+  <Tab title="This Week">
+    View week-to-date metrics:
+    
+    ```typescript
+    {
+      sales: 8732.25,
+      transactions: 324,
+      customers: 198,
+      avgTicket: 26.95
+    }
+    ```
+  </Tab>
+  
+  <Tab title="This Month">
+    View month-to-date performance:
+    
+    ```typescript
+    {
+      sales: 34567.8,
+      transactions: 1256,
+      customers: 743,
+      avgTicket: 27.52
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Dynamic Data Access
+
+```typescript
+get currentData(): SalesPeriodData {
+  return this.salesData[this.selectedPeriod as keyof SalesDataCollection];
+}
+```
+
+## Top Products Report
+
+Track best-selling products with growth indicators:
+
+```typescript
+topProducts: TopProduct[] = [
+  { 
+    name: 'Coca Cola 350ml', 
+    sales: 156, 
+    revenue: 390.0, 
+    growth: 12   // 12% growth
+  },
+  { 
+    name: 'Pan Integral Bimbo', 
+    sales: 89, 
+    revenue: 333.75, 
+    growth: -5   // 5% decline
+  },
+  { 
+    name: 'Leche Entera 1L', 
+    sales: 67, 
+    revenue: 281.4, 
+    growth: 8    // 8% growth
+  },
+  { 
+    name: 'Café Juan Valdez', 
+    sales: 34, 
+    revenue: 289.0, 
+    growth: 15   // 15% growth
+  },
+  { 
+    name: 'Arroz Diana 500g', 
+    sales: 45, 
+    revenue: 126.0, 
+    growth: 3    // 3% growth
+  },
+];
+```
+
+### Growth Indicators
+
+<Note>
+  Products display growth trends with color-coded indicators:
+  - **Positive growth**: Green indicator (↑)
+  - **Negative growth**: Red indicator (↓)
+  - **Neutral**: Gray indicator (→)
+</Note>
+
+## Category Sales Breakdown
+
+Analyze sales distribution across product categories:
+
+```typescript
+categorySales: CategorySales[] = [
+  { 
+    category: 'Bebidas', 
+    amount: 456.75, 
+    percentage: 36.6, 
+    color: 'bg-blue-500' 
+  },
+  { 
+    category: 'Lácteos', 
+    amount: 324.2, 
+    percentage: 26.0, 
+    color: 'bg-green-500' 
+  },
+  { 
+    category: 'Panadería', 
+    amount: 198.3, 
+    percentage: 15.9, 
+    color: 'bg-yellow-500' 
+  },
+  { 
+    category: 'Granos', 
+    amount: 156.45, 
+    percentage: 12.5, 
+    color: 'bg-purple-500' 
+  },
+  { 
+    category: 'Otros', 
+    amount: 111.8, 
+    percentage: 9.0, 
+    color: 'bg-gray-500' 
+  },
+];
+```
+
+### Visual Representation
+
+Categories include color coding for easy visualization:
+
+- **Bebidas** (Beverages): Blue
+- **Lácteos** (Dairy): Green
+- **Panadería** (Bakery): Yellow
+- **Granos** (Grains): Purple
+- **Otros** (Other): Gray
+
+## Custom Pipes
+
+The module includes a custom absolute value pipe for displaying numeric values:
+
+```typescript
+import { Pipe, PipeTransform } from '@angular/core';
+
+@Pipe({
+  name: 'abs',
+  standalone: true
+})
+export class AbsPipe implements PipeTransform {
+  transform(value: number): number {
+    return Math.abs(value);
+  }
+}
+```
+
+Usage in templates:
+
+```html
+<span>{{ product.growth | abs }}%</span>
+```
+
+## Dashboard Layout
+
+The reports component typically displays:
+
+<Steps>
+  <Step title="Period Selector">
+    Dropdown to switch between Today, This Week, and This Month views
+  </Step>
+  
+  <Step title="Key Metrics Cards">
+    Four primary metrics displayed in card format:
+    - Total Sales
+    - Transaction Count
+    - Customer Count
+    - Average Ticket Size
+  </Step>
+  
+  <Step title="Top Products Table">
+    Sortable table showing:
+    - Product name
+    - Units sold
+    - Revenue generated
+    - Growth percentage with visual indicators
+  </Step>
+  
+  <Step title="Category Breakdown">
+    Visual representation of sales by category with percentages
+  </Step>
+</Steps>
+
+## Data Integration
+
+### Current Implementation
+
+The component currently uses mock data for demonstration:
+
+```typescript
+salesData: SalesDataCollection = {
+  today: { sales: 1247.5, transactions: 47, customers: 32, avgTicket: 26.54 },
+  week: { sales: 8732.25, transactions: 324, customers: 198, avgTicket: 26.95 },
+  month: { sales: 34567.8, transactions: 1256, customers: 743, avgTicket: 27.52 },
+};
+```
+
+### Future Backend Integration
+
+To connect to a real backend service:
+
+```typescript
+import { ReportsService } from '../../services/reports.service';
+
+export class ReportsComponent implements OnInit {
+  constructor(
+    private reportsService: ReportsService,
+    private messageService: MessageService
+  ) {}
+  
+  ngOnInit() {
+    this.loadSalesData();
+  }
+  
+  loadSalesData() {
+    this.reportsService.getSalesData(this.selectedPeriod).subscribe({
+      next: (res) => {
+        if (res.code === 0) {
+          this.salesData = res.data;
+        }
+      },
+      error: () => {
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'No se pudieron cargar los datos de ventas.'
+        });
+      }
+    });
+  }
+  
+  onPeriodChange() {
+    this.loadSalesData();
+  }
+}
+```
+
+## Metric Calculations
+
+### Average Ticket Size
+
+```typescript
+calculateAvgTicket(sales: number, transactions: number): number {
+  return transactions > 0 ? sales / transactions : 0;
+}
+```
+
+### Growth Percentage
+
+```typescript
+calculateGrowth(current: number, previous: number): number {
+  if (previous === 0) return 0;
+  return ((current - previous) / previous) * 100;
+}
+```
+
+### Category Percentage
+
+```typescript
+calculateCategoryPercentage(categoryAmount: number, totalSales: number): number {
+  return totalSales > 0 ? (categoryAmount / totalSales) * 100 : 0;
+}
+```
+
+## Export Functionality
+
+<Note>
+  **Coming Soon**: Export reports to PDF and Excel formats will be available in future updates.
+</Note>
+
+Planned export features:
+
+```typescript
+exportToPDF() {
+  // Generate PDF report using pdfMake
+  const docDefinition = {
+    content: [
+      { text: 'Sales Report', style: 'header' },
+      { text: `Period: ${this.selectedPeriod}`, style: 'subheader' },
+      // ... report content
+    ]
+  };
+  pdfMake.createPdf(docDefinition).download('sales-report.pdf');
+}
+
+exportToExcel() {
+  // Export data to Excel format
+  // Implementation using libraries like xlsx or exceljs
+}
+```
+
+## UI Components
+
+### Required PrimeNG Modules
+
+```typescript
+imports: [
+  CommonModule,
+  FormsModule,
+  CardModule,      // Metric cards
+  ButtonModule,    // Action buttons
+  DropdownModule,  // Period selector
+  TableModule,     // Data tables
+  TagModule,       // Status tags
+]
+```
+
+## Responsive Design
+
+The reports component should be responsive across devices:
+
+- **Desktop**: Full dashboard with side-by-side metrics
+- **Tablet**: Stacked cards with scrollable tables
+- **Mobile**: Single-column layout with collapsible sections
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Performance Optimization">
+    - Use OnPush change detection strategy for better performance
+    - Implement virtual scrolling for large datasets
+    - Cache report data to reduce API calls
+  </Accordion>
+  
+  <Accordion title="Data Visualization">
+    - Use consistent color schemes across reports
+    - Provide clear visual indicators for trends
+    - Include tooltips for detailed information
+  </Accordion>
+  
+  <Accordion title="Error Handling">
+    - Display user-friendly error messages
+    - Provide fallback data or empty states
+    - Log errors for debugging
+  </Accordion>
+</AccordionGroup>
+
+## Extensibility
+
+The reports module can be extended with:
+
+1. **Date Range Picker**: Custom date range selection
+2. **Chart Integration**: Add charts using libraries like Chart.js or ApexCharts
+3. **Real-time Updates**: WebSocket integration for live data
+4. **Advanced Filters**: Filter by product, category, customer, etc.
+5. **Comparison Mode**: Compare periods side-by-side
+6. **Export Options**: PDF, Excel, CSV exports
+7. **Scheduled Reports**: Email automated reports
+
+## Reference
+
+- Component: `~/workspace/source/src/app/components/pages/reports/reports.component.ts`
+- Lines: 1-82
+- Interfaces: `~/workspace/source/src/app/components/pages/api/reports.ts`
+- Current Status: Mock data implementation, ready for backend integration

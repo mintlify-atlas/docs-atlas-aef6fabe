@@ -1,0 +1,678 @@
+---
+title: 'Inventory Management'
+description: 'Comprehensive inventory control with multi-warehouse support, stock tracking, and bulk import/export capabilities'
+icon: 'warehouse'
+---
+
+# Inventory Management
+
+The Inventory Management module provides complete control over your product catalog, stock levels across multiple warehouses, pricing, and categorization.
+
+## Overview
+
+Built with Angular 19 and PrimeNG Table component, the inventory system supports:
+- Multi-warehouse stock management
+- Min/max stock levels per warehouse
+- Bulk import/export via Excel
+- Category and unit of measure organization
+- Product images with Digital Ocean integration
+- Real-time filtering and search
+
+**Location**: `~/workspace/source/src/app/components/pages/inventory/inventory.component.ts`
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Multi-Warehouse Support" icon="warehouse">
+    Track stock levels, minimums, and maximums across multiple warehouses
+  </Card>
+  <Card title="Bulk Operations" icon="file-excel">
+    Import and export thousands of products via Excel spreadsheets
+  </Card>
+  <Card title="Image Management" icon="image">
+    Store product images in Digital Ocean Spaces with automatic URL generation
+  </Card>
+  <Card title="Low Stock Alerts" icon="triangle-exclamation">
+    Automatic identification of products below minimum stock levels
+  </Card>
+</CardGroup>
+
+## Product Data Model
+
+The complete product interface includes all fields for comprehensive inventory management:
+
+```typescript
+export interface Product {
+    id: number;
+    companiaId: number;
+    code: number;
+    name: string;
+    description: string;
+    barcode: string;
+    reference?: string;
+    extension1?: string;  // Custom field 1
+    extension2?: string;  // Custom field 2
+    tag?: string;
+    price: number;
+    imageUrl?: string;
+    categoryId: number;
+    category?: string;
+    unitMeasureId: number;
+    unitMeasure?: string;
+    active: boolean;
+    manageStock: boolean;
+    reservedStock: number;
+    createdAt?: string;
+    updatedAt?: string;
+    hasPromotion?: boolean;
+    hasDiscount?: boolean;
+    discountPercent?: number;
+    
+    // Multi-warehouse data
+    maximosMinimos: ProductMinMaxByWarehouse[];
+    existencias: ProductStockByWarehouse[];
+}
+```
+**Source**: `src/app/components/pages/api/shared.ts:43-83`
+
+### Warehouse Stock Tracking
+
+```typescript
+export interface ProductStockByWarehouse {
+    wareHouse: string;
+    wareHouseId: number;
+    stock: number;
+}
+
+export interface ProductMinMaxByWarehouse {
+    wareHouse: string;
+    wareHouseId: number;
+    minStock: number;
+    maxStock: number;
+}
+```
+**Source**: `src/app/components/pages/api/shared.ts:84-95`
+
+## Component Architecture
+
+### Core Properties
+
+```typescript
+export class InventoryComponent implements OnInit {
+    inventory: Product[] = [];
+    filteredInventory: Product[] = [];
+    categories: Category[] = [];
+    masterWarehouses: Warehouse[] = [];
+    unitsMeasure: UnitOfMeasure[] = [];
+    
+    // UI state
+    warehousesUI: WarehouseUI[] = [];  // Unified warehouse form data
+    loading: boolean = false;
+    showAddDialog = false;
+    showEditDialog = false;
+    
+    // Statistics
+    totalItems = 0;
+    totalValue = 0;
+    lowStockItems: Product[] = [];
+    
+    // Permissions
+    canView = false;
+    canCreate = false;
+    canEdit = false;
+    canDelete = false;
+    canExport = false;
+}
+```
+**Source**: `inventory.component.ts:38-77`
+
+## Loading Inventory
+
+Products are loaded with warehouse data parsed from JSON:
+
+```typescript
+loadInventory() {
+    this.inventoryService.getProducts(this.companiaId).subscribe({
+        next: (res) => {
+            this.inventory = (res.data || []).map((item: any) => ({
+                ...item,
+                maximosMinimos: item.maximosMinimos ? 
+                    JSON.parse(item.maximosMinimos) : [],
+                existencias: item.existencias ? 
+                    JSON.parse(item.existencias) : []
+            }));
+            
+            this.filteredInventory = [...this.inventory];
+            this.calculateTotals();
+        }
+    });
+}
+```
+**Source**: `inventory.component.ts:208-222`
+
+<Info>
+  Warehouse data (`maximosMinimos` and `existencias`) is stored as JSON strings in the database and parsed on load.
+</Info>
+
+## Statistics Calculation
+
+The system automatically calculates inventory metrics:
+
+```typescript
+calculateTotals() {
+    this.totalItems = 0;
+    this.totalValue = 0;
+    this.lowStockItems = [];
+    
+    this.inventory.forEach((item) => {
+        const stockTotal = this.getProductTotalStock(item);
+        this.totalItems += stockTotal;
+        this.totalValue += stockTotal * (item.price || 0);
+        
+        // Low stock detection (below 5 units)
+        if (item.manageStock && stockTotal <= 5) {
+            this.lowStockItems.push(item);
+        }
+    });
+}
+
+getProductTotalStock(product: Product): number {
+    if (!product.existencias) return 0;
+    return product.existencias.reduce(
+        (acc, curr) => acc + (curr.stock || 0), 0
+    );
+}
+```
+**Source**: `inventory.component.ts:241-256` and `inventory.component.ts:236-239`
+
+## Filtering Products
+
+Advanced filtering by multiple criteria:
+
+```typescript
+filters = {
+    nameOrReference: '',
+    category: null,
+    extension1: '',
+    extension2: '',
+    unitMeasure: '',
+    active: true,
+    minPrice: null,
+    maxPrice: null
+};
+
+filterProducts() {
+    this.filteredInventory = this.inventory.filter((item) => {
+        const matchesSearch = !this.filters.nameOrReference ||
+            item.name.toLowerCase().includes(
+                this.filters.nameOrReference.toLowerCase()
+            ) ||
+            item.reference?.toLowerCase().includes(
+                this.filters.nameOrReference.toLowerCase()
+            ) ||
+            item.barcode?.toLowerCase().includes(
+                this.filters.nameOrReference.toLowerCase()
+            );
+        
+        const matchesCategory = !this.filters.category || 
+            item.categoryId === this.filters.category;
+        
+        const matchesExtension = !this.filters.extension1 || 
+            item.extension1?.toLowerCase().includes(
+                this.filters.extension1.toLowerCase()
+            );
+        
+        const matchesActive = item.active === this.filters.active;
+        
+        return matchesSearch && matchesCategory && 
+               matchesExtension && matchesActive;
+    });
+}
+```
+**Source**: `inventory.component.ts:58-67` and `inventory.component.ts:258-272`
+
+## Multi-Warehouse Management
+
+### Warehouse UI Preparation
+
+When adding or editing a product, warehouse data is unified into a single interface:
+
+```typescript
+interface WarehouseUI extends ProductWarehouseRequest {
+    name: string;  // Display name in modal
+}
+
+prepareWarehouseUI(product?: Product) {
+    this.warehousesUI = this.masterWarehouses.map((wh) => {
+        // Find existing stock for this warehouse
+        const stockRecord = product?.existencias?.find(
+            (e) => e.wareHouseId === wh.id
+        );
+        
+        // Find existing min/max for this warehouse
+        const limitRecord = product?.maximosMinimos?.find(
+            (m) => m.wareHouseId === wh.id
+        );
+        
+        return {
+            warehouseId: wh.id!,
+            name: wh.name,
+            stock: stockRecord?.stock ?? 0,
+            minStock: limitRecord?.minStock ?? 0,
+            maxStock: limitRecord?.maxStock ?? 0
+        };
+    });
+}
+```
+**Source**: `inventory.component.ts:27-29` and `inventory.component.ts:280-296`
+
+### Saving Product with Warehouse Data
+
+```typescript
+saveProduct() {
+    const request: ProductCreateRequest = {
+        id: this.newProduct.id,
+        userId: this.userId,
+        companiaId: this.companiaId,
+        name: this.newProduct.name,
+        description: this.newProduct.description || '',
+        barcode: this.newProduct.barcode,
+        reference: this.newProduct.reference,
+        extension1: this.newProduct.extension1,
+        extension2: this.newProduct.extension2,
+        price: this.newProduct.price,
+        imageUrl: this.newProduct.imageUrl,
+        categoryId: this.newProduct.categoryId,
+        unitMeasureId: this.newProduct.unitMeasureId,
+        active: this.newProduct.active,
+        manageStock: this.newProduct.manageStock,
+        
+        // Map warehouse UI to request format
+        warehouses: this.warehousesUI.map((w) => ({
+            warehouseId: w.warehouseId,
+            stock: w.stock,
+            minStock: w.minStock,
+            maxStock: w.maxStock
+        }))
+    };
+    
+    this.inventoryService.createProduct(request).subscribe({
+        next: () => {
+            this.messageService.add({
+                severity: 'success',
+                summary: 'Éxito',
+                detail: 'Producto guardado'
+            });
+            this.closeDialog();
+            this.loadInventory();
+        }
+    });
+}
+```
+**Source**: `inventory.component.ts:325-359`
+
+## Image Management
+
+Images are stored in Digital Ocean Spaces:
+
+### Digital Ocean Configuration
+
+```typescript
+digitalOcean: DigitalOceanSettings = {
+    accessKey: '',
+    secretKey: '',
+    serviceUrl: '',
+    bucketName: '',
+    url: ''  // CDN URL
+};
+
+loadSettings() {
+    this.masterService.getConfiguration(this.companiaId).subscribe({
+        next: (res) => {
+            if (res.code === 0 && res.data) {
+                this.digitalOcean = {
+                    accessKey: res.data.accessKey,
+                    secretKey: res.data.secretKey,
+                    serviceUrl: res.data.serviceUrl,
+                    bucketName: res.data.bucketName,
+                    url: res.data.url
+                };
+            }
+        }
+    });
+}
+```
+**Source**: `inventory.component.ts:94-100` and `inventory.component.ts:169-192`
+
+### Image URL Generation
+
+```typescript
+getImageUrl(): string | null {
+    if (!this.newProduct.imageUrl) return null;
+    
+    // Detect base64 encoded image
+    const isBase64 = this.newProduct.imageUrl.startsWith('data:');
+    
+    if (isBase64) {
+        return this.newProduct.imageUrl;
+    }
+    
+    // Construct Digital Ocean URL
+    return this.digitalOcean.url + '/' + this.newProduct.imageUrl;
+}
+```
+**Source**: `inventory.component.ts:194-206`
+
+### Image Selection
+
+```typescript
+onImageSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e: any) => {
+            this.newProduct.imageUrl = e.target.result;  // Base64
+        };
+        reader.readAsDataURL(file);
+    }
+}
+```
+**Source**: `inventory.component.ts:316-323`
+
+<Note>
+  Images are uploaded as base64 in the `imageUrl` field. The backend handles conversion and storage to Digital Ocean Spaces.
+</Note>
+
+## Bulk Import/Export
+
+### Export to Excel
+
+Export current filtered inventory with warehouse columns:
+
+```typescript
+exportToExcel() {
+    const dataToExport = this.filteredInventory.map((p) => {
+        const row: any = {
+            ID: p.id,
+            Código: p.code,
+            Nombre: p.name,
+            Referencia: p.reference || '',
+            'Código Barras': p.barcode || '',
+            'Categoría ID': p.categoryId,
+            'Extension 1': p.extension1 || '',
+            'Extension 2': p.extension2 || '',
+            Precio: p.price,
+            'Unidad Medida ID': p.unitMeasureId,
+            'Maneja Stock': p.manageStock ? 'SI' : 'NO',
+            Activo: p.active ? 'SI' : 'NO'
+        };
+        
+        // Add dynamic columns for each warehouse
+        this.masterWarehouses.forEach((wh) => {
+            const stock = p.existencias?.find(
+                (e) => e.wareHouseId === wh.id
+            )?.stock || 0;
+            const min = p.maximosMinimos?.find(
+                (m) => m.wareHouseId === wh.id
+            )?.minStock || 0;
+            const max = p.maximosMinimos?.find(
+                (m) => m.wareHouseId === wh.id
+            )?.maxStock || 0;
+            
+            row[`Stock - ${wh.name}`] = stock;
+            row[`Min - ${wh.name}`] = min;
+            row[`Max - ${wh.name}`] = max;
+        });
+        
+        return row;
+    });
+    
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventario');
+    
+    XLSX.writeFile(workbook, `Inventario_Compania_${this.companiaId}.xlsx`);
+}
+```
+**Source**: `inventory.component.ts:365-403`
+
+### Import from Excel
+
+<Steps>
+  <Step title="Select File">
+    User selects an Excel file via file input:
+    
+    ```typescript
+    importExcel(event: any) {
+        this.loading = true;
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e: any) => {
+            const bstr = e.target.result;
+            const wb = XLSX.read(bstr, { type: 'binary' });
+            const wsname = wb.SheetNames[0];
+            const ws = wb.Sheets[wsname];
+            const data: any[] = XLSX.utils.sheet_to_json(ws);
+            
+            this.processBulkData(data);
+        };
+        reader.readAsBinaryString(file);
+    }
+    ```
+    **Source**: `inventory.component.ts:408-425`
+  </Step>
+  
+  <Step title="Process Rows">
+    Map Excel rows to ProductCreateRequest objects:
+    
+    ```typescript
+    processBulkData(rows: any[]) {
+        const requests: ProductCreateRequest[] = rows.map((row) => {
+            // Map warehouse columns dynamically
+            const warehousesForThisProduct = this.masterWarehouses.map((wh) => ({
+                warehouseId: wh.id!,
+                stock: Number(row[`Stock - ${wh.name}`] || 0),
+                minStock: Number(row[`Min - ${wh.name}`] || 0),
+                maxStock: Number(row[`Max - ${wh.name}`] || 0)
+            }));
+            
+            return {
+                id: Number(row['ID'] || 0),  // 0 = new product
+                userId: this.userId,
+                companiaId: this.companiaId,
+                name: row['Nombre'],
+                description: row['Descripción'] || '',
+                barcode: String(row['Código Barras'] || ''),
+                reference: String(row['Referencia'] || ''),
+                extension1: row['Extension 1'] || '',
+                extension2: row['Extension 2'] || '',
+                price: Number(row['Precio'] || 0),
+                imageUrl: row['Imagen URL'] || '',
+                categoryId: Number(row['Categoría ID']),
+                unitMeasureId: Number(row['Unidad Medida ID']),
+                active: row['Activo'] === 'SI',
+                manageStock: row['Maneja Stock'] === 'SI',
+                warehouses: warehousesForThisProduct
+            };
+        });
+        
+        // Send bulk request
+        this.inventoryService.createProductBulk(requests).subscribe({
+            next: () => {
+                this.loading = false;
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Carga Masiva',
+                    detail: `Se procesaron ${requests.length} productos exitosamente.`
+                });
+                this.loadInventory();
+            },
+            error: (err) => {
+                this.loading = false;
+                this.messageService.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: `No se pudo cargar el archivo: ${err.message}`
+                });
+            }
+        });
+    }
+    ```
+    **Source**: `inventory.component.ts:429-485`
+  </Step>
+</Steps>
+
+<Warning>
+  Excel column names must match exactly, including warehouse names (e.g., "Stock - Bodega Principal"). Export a template first to ensure proper formatting.
+</Warning>
+
+## Categories and Units
+
+Master data is loaded from the MasterService:
+
+```typescript
+loadCategories() {
+    this.masterService.getCategories(this.companiaId).subscribe((res) => {
+        this.categories = res.data;
+    });
+}
+
+loadUnitOfMeasure() {
+    this.masterService.getUnitOfMeasure().subscribe((res) => {
+        this.unitsMeasure = res.data || [];
+    });
+}
+```
+**Source**: `inventory.component.ts:224-234`
+
+## Permissions
+
+The inventory module checks permissions for the "Inventario" module:
+
+```typescript
+private applyPermissions(): void {
+    const moduleName = 'Inventario';
+    const permission = this.permissions.find((p) => p.module === moduleName);
+    
+    if (!permission) {
+        this.resetPermissions();
+        return;
+    }
+    
+    this.canView = permission.canView;
+    this.canCreate = permission.canCreate;
+    this.canEdit = permission.canEdit;
+    this.canDelete = permission.canDelete;
+    this.canExport = permission.canExport;
+}
+```
+**Source**: `inventory.component.ts:138-153`
+
+## UI Features
+
+<Tabs>
+  <Tab title="Add Product">
+    ```typescript
+    openAddDialog() {
+        this.newProduct = { active: true, manageStock: true, price: 0 };
+        this.prepareWarehouseUI();  // Initialize warehouse fields
+        this.showAddDialog = true;
+    }
+    ```
+    **Source**: `inventory.component.ts:298-302`
+  </Tab>
+  
+  <Tab title="Edit Product">
+    ```typescript
+    editProduct(product: Product) {
+        this.newProduct = { ...product };
+        this.prepareWarehouseUI(product);  // Load existing warehouse data
+        this.showEditDialog = true;
+    }
+    ```
+    **Source**: `inventory.component.ts:304-308`
+  </Tab>
+  
+  <Tab title="Reset Filters">
+    ```typescript
+    resetFilters() {
+        this.filters = {
+            nameOrReference: '',
+            category: null,
+            extension1: '',
+            extension2: '',
+            unitMeasure: '',
+            active: true,
+            minPrice: null,
+            maxPrice: null
+        };
+        this.filterProducts();
+    }
+    ```
+    **Source**: `inventory.component.ts:274-277`
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<Steps>
+  <Step title="Set Min/Max Stock Levels">
+    Always configure minimum and maximum stock levels for products with `manageStock` enabled. This enables low-stock alerts.
+  </Step>
+  
+  <Step title="Use Consistent Categories">
+    Create and use categories consistently to enable better filtering and reporting.
+  </Step>
+  
+  <Step title="Test Bulk Import First">
+    Export your current inventory, modify it, and reimport a small subset first to verify the format before bulk uploads.
+  </Step>
+  
+  <Step title="Leverage Custom Fields">
+    Use `extension1` and `extension2` fields for product attributes like color, size, or brand for enhanced filtering.
+  </Step>
+</Steps>
+
+## Integration with POS
+
+The POS system loads products using the InventoryService:
+
+```typescript
+// In POS Component
+loadInventory() {
+    this.inventoryService.getProductsStore(this.companiaId).subscribe({
+        next: (res) => {
+            this.products = res.data || [];
+        },
+        error: () => this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'No se pudo cargar el inventario.'
+        })
+    });
+}
+```
+**Source**: `pos.component.ts:136-148`
+
+<Info>
+  The POS uses `getProductsStore()` which returns products with aggregated stock across warehouses, while the inventory management uses `getProducts()` for detailed per-warehouse data.
+</Info>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Reports" icon="chart-line" href="/features/reports">
+    Monitor products and analyze sales
+  </Card>
+  <Card title="POS System" icon="cash-register" href="/features/pos-system">
+    Use inventory in point of sale transactions
+  </Card>
+  <Card title="Categories" icon="tags" href="/admin/categories">
+    Manage product categories
+  </Card>
+  <Card title="Warehouses" icon="warehouse" href="/admin/warehouses">
+    Configure warehouse locations
+  </Card>
+</CardGroup>

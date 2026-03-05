@@ -1,0 +1,424 @@
+---
+title: 'Category Management'
+description: 'Organize products with categories for better inventory organization and reporting'
+icon: 'folder-tree'
+---
+
+## Overview
+
+The Category Management module enables product organization through hierarchical categorization. Create, edit, and manage product categories to improve inventory organization, facilitate reporting, and enhance the shopping experience.
+
+<Note>
+  This module requires the **Categorías** permission with `canView` enabled. Creating and editing categories requires `canCreate` and `canEdit` permissions.
+</Note>
+
+## Component Location
+
+```
+~/workspace/source/src/app/components/pages/master/categorys/categorys.component.ts
+```
+
+## Data Model
+
+### Category Interface
+
+<ParamField path="id" type="number">
+  Unique category identifier (auto-generated)
+</ParamField>
+
+<ParamField path="companiaId" type="number" required>
+  Company ID this category belongs to (multi-tenant support)
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Category name (e.g., "Electronics", "Beverages", "Clothing")
+</ParamField>
+
+<ParamField path="description" type="string">
+  Optional detailed description of the category
+</ParamField>
+
+<ParamField path="active" type="boolean">
+  Whether the category is currently active (default: true)
+</ParamField>
+
+<ParamField path="createdAt" type="Date">
+  Timestamp when the category was created
+</ParamField>
+
+## Category Management Workflow
+
+<Steps>
+  <Step title="Access Categories Module">
+    Navigate to **Master > Categories** from the main menu. You'll see a table displaying all categories with:
+    - Category Name
+    - Description
+    - Active Status
+    - Action buttons (Edit/Delete)
+  </Step>
+
+  <Step title="Create New Category">
+    Click the **New Category** button to open the creation dialog.
+    
+    **Required Fields:**
+    - **Name**: Category name (must not be empty)
+    
+    **Optional Fields:**
+    - **Description**: Detailed category description
+    - **Active**: Toggle category status (default: active)
+    
+    <Warning>
+      Category name is mandatory. The system will show a warning toast if it's empty or contains only whitespace.
+    </Warning>
+  </Step>
+
+  <Step title="Define Category Details">
+    Fill in the category information:
+    
+    - **Name**: Use clear, descriptive names (e.g., "Electronics", "Dairy Products")
+    - **Description**: Add context about what products belong in this category
+    - **Active**: Keep enabled for categories in current use
+    
+    <Info>
+      Good category names improve product findability and reporting clarity.
+    </Info>
+  </Step>
+
+  <Step title="Save Category">
+    Click **Save** to create the category. The system:
+    
+    1. Validates that the name field is not empty
+    2. Trims whitespace from the name
+    3. Creates the category record
+    4. Associates it with your company (companiaId)
+    5. Sets active status to true by default
+    6. Reloads the category list
+    
+    The category is now available for product assignment.
+  </Step>
+
+  <Step title="Edit Existing Category">
+    Click the **Edit** icon on any category row to modify:
+    - Category name
+    - Description
+    - Active status
+    
+    <Note>
+      Editing a category name updates it for all products already assigned to this category.
+    </Note>
+  </Step>
+
+  <Step title="Deactivate Category">
+    Instead of deleting, deactivate categories no longer in use:
+    
+    1. Click the **Delete** icon
+    2. System sets `active = false` (soft delete)
+    3. Category is hidden from active dropdown lists
+    4. Products with this category retain the assignment
+    
+    <Info>
+      Deactivating preserves historical data. Products keep their category for reporting purposes.
+    </Info>
+  </Step>
+</Steps>
+
+## Validation Rules
+
+### Name Field
+- **Required**: Yes
+- **Format**: Any non-empty text
+- **Validation**: Trimmed before saving (`name.trim()`)
+- **Best Practice**: Use title case (e.g., "Electronic Accessories" not "electronic accessories")
+- **Example**: "Beverages", "Frozen Foods", "Office Supplies"
+
+### Description Field
+- **Required**: No
+- **Format**: Free text
+- **Best Practice**: Explain category scope and typical products
+- **Example**: "All beverages including soft drinks, juices, and bottled water"
+
+### Active Status
+- **Default**: true
+- **Type**: Boolean
+- **Purpose**: Soft delete mechanism to hide categories without losing data
+
+## Search and Filter
+
+The component provides real-time search across category fields:
+
+```typescript
+filterCategories() {
+  const term = this.searchTerm.toLowerCase();
+  this.filteredCategories = this.categories.filter((cat) =>
+    cat.name.toLowerCase().includes(term) ||
+    (cat.description?.toLowerCase().includes(term) ?? false)
+  );
+}
+```
+
+Type in the search box to filter categories by:
+- **Name**: Full or partial category name
+- **Description**: Keywords in the description
+
+<Info>
+  The search is case-insensitive and matches partial strings. Searching "elec" will find "Electronics".
+</Info>
+
+## Product Integration
+
+Categories are linked to products through the product management system:
+
+### Product-Category Relationship
+
+```typescript
+export interface Product {
+  // ... other fields
+  categoryId: number;      // Foreign key to Category
+  category?: string;       // Category name (for display)
+  // ...
+}
+```
+
+When creating or editing products:
+1. Select a category from the dropdown
+2. System stores `categoryId` with the product
+3. Category name is displayed in product listings
+4. Reports can be grouped by category
+
+<Note>
+  Each product belongs to exactly one category. Multi-category assignment is not supported in the current version.
+</Note>
+
+## Reporting and Analytics
+
+Categories enable powerful reporting features:
+
+### Sales by Category
+- Track which categories generate the most revenue
+- Identify seasonal trends per category
+- Compare performance across categories
+
+### Inventory by Category
+- View stock levels grouped by category
+- Identify overstocked or understocked categories
+- Plan purchasing by category
+
+### AI-Powered Categorization
+
+When AI settings are enabled (see Settings module):
+- Google Gemini can suggest categories for new products
+- Auto-categorization based on product name and description
+- Requires `aiSettings.autoCategorize = true`
+
+<Info>
+  AI categorization uses the Gemini API to analyze product data and suggest the most appropriate category from your existing list.
+</Info>
+
+## API Integration
+
+### Load Categories
+```typescript
+this.masterService.getCategories(this.companiaId).subscribe({
+  next: (res: ApiResponse<Category[]>) => {
+    this.categories = res.data || [];
+    this.filteredCategories = this.categories;
+  },
+  error: () => {
+    this.messageService.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'No se pudieron cargar las categorías.'
+    });
+  }
+});
+```
+
+### Create or Update Category
+```typescript
+this.masterService.createCategory(this.newCategory).subscribe({
+  next: (res) => {
+    if (res.code === 0) {
+      this.messageService.add({
+        severity: 'success',
+        summary: 'Éxito',
+        detail: isEditing 
+          ? 'Categoría actualizada correctamente.' 
+          : 'Categoría creada correctamente.'
+      });
+      this.showDialog = false;
+      this.loadCategories();
+    }
+  }
+});
+```
+
+### Deactivate Category (Soft Delete)
+```typescript
+deleteCategory(cat: Category) {
+  this.masterService.deleteCategory({ ...cat, active: false }).subscribe({
+    next: (res) => {
+      if (res.code === 0) {
+        this.messageService.add({
+          severity: 'info',
+          summary: 'Desactivada',
+          detail: `Categoría "${cat.name}" desactivada correctamente.`
+        });
+        this.loadCategories();
+      }
+    }
+  });
+}
+```
+
+<Info>
+  The system uses soft deletion to preserve data integrity. Deactivated categories remain in the database but are hidden from dropdown lists.
+</Info>
+
+## Permission Requirements
+
+The component implements role-based access control:
+
+```typescript
+private applyPermissions(): void {
+  const moduleName = 'Categorías';
+  const permission = this.permissions.find((p) => 
+    p.module === moduleName
+  );
+  
+  this.canView = permission.canView;      // View category list
+  this.canCreate = permission.canCreate;  // Create new category
+  this.canEdit = permission.canEdit;      // Edit category details
+  this.canDelete = permission.canDelete;  // Deactivate category
+  this.canExport = permission.canExport;  // Export to Excel/CSV
+}
+```
+
+UI elements are conditionally rendered based on permissions:
+
+```html
+<button *ngIf="canCreate" (click)="openNewDialog()">New Category</button>
+<button *ngIf="canEdit" (click)="editCategory(cat)">Edit</button>
+<button *ngIf="canDelete" (click)="deleteCategory(cat)">Delete</button>
+```
+
+## UI Components
+
+PrimeNG components used:
+
+- **Table**: Display categories with sorting and filtering
+- **Dialog**: Modal form for create/edit operations
+- **InputText**: Text field for category name
+- **TextArea**: Multi-line description input
+- **InputSwitch**: Toggle active status
+- **Button**: Action buttons with icons
+- **Toast**: Success/error/info notifications
+
+## Category Organization Strategies
+
+### Retail Store Example
+```
+Electronics
+  - Computers & Tablets
+  - Mobile Phones
+  - Audio & Video
+
+Clothing
+  - Men's Apparel
+  - Women's Apparel
+  - Children's Apparel
+
+Home & Garden
+  - Furniture
+  - Kitchen Appliances
+  - Garden Tools
+```
+
+### Restaurant/Café Example
+```
+Beverages
+Appetizers
+Main Courses
+Desserts
+Alcoholic Drinks
+```
+
+### Grocery Store Example
+```
+Fresh Produce
+Dairy & Eggs
+Meat & Seafood
+Bakery
+Frozen Foods
+Beverages
+Snacks & Candy
+```
+
+<Note>
+  The current system supports flat categories. If you need hierarchical categories (subcategories), consider using naming conventions like "Electronics - Mobile Phones".
+</Note>
+
+## Best Practices
+
+<Info>
+  **Use consistent naming**: Establish naming conventions before creating categories (e.g., all singular or all plural).
+</Info>
+
+<Warning>
+  **Don't over-categorize**: Too many categories make product assignment confusing. Start with broad categories and add more as needed.
+</Warning>
+
+<Note>
+  **Plan before implementation**: Sketch your category structure on paper before creating categories in the system.
+</Note>
+
+<Info>
+  **Regular review**: Audit categories quarterly. Merge or deactivate unused categories to keep the system clean.
+</Info>
+
+## Troubleshooting
+
+### Category Not Saving
+- Ensure the Name field is not empty
+- Remove leading/trailing spaces (system auto-trims)
+- Verify you have `canCreate` or `canEdit` permission
+- Check browser console for API errors
+
+### Category Not Appearing in Product Dropdown
+- Verify category `active` status is true
+- Confirm category belongs to the same `companiaId`
+- Refresh the product management page
+- Check that category was saved successfully
+
+### Can't Delete Category
+- Verify you have `canDelete` permission
+- Check if products are assigned to this category
+- Review error message in toast notification
+- Consider deactivating instead of deleting
+
+### Duplicate Category Names
+- System doesn't enforce unique names (by design)
+- Manually check for duplicates before creating
+- Use search to find similar category names
+- Consider adding context to similar names (e.g., "Beverages - Hot", "Beverages - Cold")
+
+## Future Enhancements
+
+Potential improvements for the category system:
+
+1. **Hierarchical Categories**: Parent-child category relationships
+2. **Category Icons**: Visual icons for each category
+3. **Display Order**: Custom sorting order for categories
+4. **Category Attributes**: Custom fields per category
+5. **Bulk Operations**: Import/export categories via CSV
+6. **Category Images**: Banner images for e-commerce integration
+
+## Code Reference
+
+Key implementation files:
+
+- Component: `categorys.component.ts:27-221`
+- Interface: `api/shared.ts:20-27`
+- Validation: `categorys.component.ts:153-161`
+- Search Filter: `categorys.component.ts:131-134`
+- Permissions: `categorys.component.ts:88-111`
+- Soft Delete: `categorys.component.ts:194-220`

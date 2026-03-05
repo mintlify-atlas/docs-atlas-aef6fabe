@@ -1,0 +1,365 @@
+---
+title: 'Company Setup'
+description: 'Manage company profiles, business information, and multi-tenant configurations'
+icon: 'building'
+---
+
+## Overview
+
+The Company Setup module allows administrators to manage company profiles in a multi-tenant POS system. Each company has its own business information, tax identification, contact details, and branding (logo).
+
+<Note>
+  This module requires the **Compañías** permission with `canView` enabled. Creating and editing companies requires `canCreate` and `canEdit` permissions.
+</Note>
+
+## Component Location
+
+```
+~/workspace/source/src/app/components/pages/master/company/company.component.ts
+```
+
+## Data Model
+
+### Company Interface
+
+<ParamField path="companyId" type="number" required>
+  Unique company identifier (0 for new companies)
+</ParamField>
+
+<ParamField path="nit" type="string" required>
+  Tax identification number (NIT in Colombia, EIN in USA, etc.)
+</ParamField>
+
+<ParamField path="verificationDigit" type="number" required>
+  Verification digit for NIT validation (0-9). Used in Colombian tax IDs.
+</ParamField>
+
+<ParamField path="businessName" type="string" required>
+  Legal business name (Razón Social)
+</ParamField>
+
+<ParamField path="email" type="string">
+  Company contact email address
+</ParamField>
+
+<ParamField path="address" type="string">
+  Physical business address
+</ParamField>
+
+<ParamField path="image" type="string">
+  Base64-encoded company logo or URL to logo image
+</ParamField>
+
+<ParamField path="createdByUserId" type="number">
+  User ID who created this company record
+</ParamField>
+
+<ParamField path="updatedByUserId" type="number">
+  User ID who last updated this company
+</ParamField>
+
+<ParamField path="createdAt" type="string">
+  ISO timestamp of company creation
+</ParamField>
+
+<ParamField path="updatedAt" type="string">
+  ISO timestamp of last update
+</ParamField>
+
+## Company Management Workflow
+
+<Steps>
+  <Step title="Access Company Module">
+    Navigate to **Master > Company** from the main menu. You'll see a table listing all registered companies with:
+    - Business Name
+    - NIT + Verification Digit
+    - Email
+    - Address
+    - Logo (if uploaded)
+  </Step>
+
+  <Step title="Create New Company">
+    Click the **New Company** button. A dialog opens with the following form fields:
+    
+    **Required Fields:**
+    - **NIT**: Tax identification number
+    - **Verification Digit**: Single digit (0-9)
+    - **Business Name**: Legal company name
+    
+    **Optional Fields:**
+    - **Email**: Contact email
+    - **Address**: Physical location
+    - **Logo**: Upload company logo
+    
+    <Warning>
+      All three required fields must be filled before saving. The system will show a warning toast if any are missing.
+    </Warning>
+  </Step>
+
+  <Step title="Upload Company Logo">
+    Click the **Upload Image** button to select a logo file:
+    
+    1. Select an image file (PNG, JPG, SVG recommended)
+    2. The image is converted to Base64 encoding
+    3. Preview appears in the dialog
+    
+    <Info>
+      Images are stored as Base64 strings in the database. For large logos, consider using DigitalOcean Spaces (configured in Settings).
+    </Info>
+  </Step>
+
+  <Step title="Save Company">
+    Click **Save** to create the company. The system:
+    
+    1. Validates required fields (NIT, Verification Digit, Business Name)
+    2. Sends the company data to the backend
+    3. Creates the company record with `companyId = 0` (new)
+    4. Displays success confirmation
+    5. Reloads the company list
+    
+    <Note>
+      After saving, the page reloads to show the new company. This is by design to ensure fresh data.
+    </Note>
+  </Step>
+
+  <Step title="Edit Existing Company">
+    Click the **Edit** icon on any company row. The dialog opens with:
+    - Pre-filled company data
+    - Existing logo displayed
+    - Title changes to "Editar Compañía"
+    
+    Modify any fields and click **Save** to update.
+  </Step>
+
+  <Step title="Delete Company">
+    Click the **Delete** icon and confirm the deletion.
+    
+    <Warning>
+      Deleting a company is irreversible and may affect associated users, sales, and inventory. Use with caution.
+    </Warning>
+  </Step>
+</Steps>
+
+## Validation Rules
+
+### NIT Validation
+- Cannot be empty
+- Should match country-specific tax ID format
+- Common format in Colombia: 9 digits + 1 verification digit
+
+### Verification Digit
+- Must be a number between 0 and 9
+- Calculated using a specific algorithm (varies by country)
+- Required even if 0
+
+### Business Name
+- Cannot be empty
+- Should be the legal registered name
+- Used in receipts and official documents
+
+### Email
+- Optional but recommended
+- Should be a valid email format
+- Used for notifications and official communications
+
+### Logo Image
+- Recommended size: 200x200px to 400x400px
+- Supported formats: PNG, JPG, SVG
+- Stored as Base64 in database
+- Used on receipts and invoices
+
+## Search and Filter
+
+The component includes real-time search functionality:
+
+```typescript
+filterCompanies() {
+  if (!this.searchTerm) {
+    this.filteredCompanies = [...this.companies];
+  } else {
+    const search = this.searchTerm.toLowerCase();
+    this.filteredCompanies = this.companies.filter((c) =>
+      c.businessName?.toLowerCase().includes(search) ||
+      c.nit?.toLowerCase().includes(search)
+    );
+  }
+}
+```
+
+Type in the search box to filter companies by:
+- Business Name
+- NIT
+
+## Image Upload Implementation
+
+The component uses FileReader to convert images to Base64:
+
+```typescript
+onFileSelected(event: any) {
+  const file = event.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = (e: any) => {
+      this.selectedImage = e.target.result;
+      this.activeCompany.Image = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+}
+```
+
+This approach:
+- Converts images to Base64 strings
+- Stores them directly in the database
+- Allows immediate preview before saving
+- Works without external storage dependencies
+
+<Info>
+  For production systems with many companies, consider using DigitalOcean Spaces (configured in Settings) to store logos as files instead of Base64.
+</Info>
+
+## API Integration
+
+### Load Companies
+```typescript
+this.masterService.getCompanies().subscribe({
+  next: (res) => {
+    if (res.code === 0) {
+      this.companies = res.data || [];
+      this.filteredCompanies = [...this.companies];
+    }
+  }
+});
+```
+
+### Create/Update Company
+```typescript
+const payload = {
+  option: 'CREATE',
+  companyId: this.activeCompany.companyId ?? 0,
+  userId: 1, // From session in production
+  nit: this.activeCompany.nit,
+  verificationDigit: this.activeCompany.verificationDigit,
+  businessName: this.activeCompany.businessName,
+  email: this.activeCompany.email,
+  address: this.activeCompany.address,
+  image: this.activeCompany.image
+};
+
+this.masterService.createCompany(payload).subscribe({
+  next: (res) => {
+    if (res.code === 0) {
+      // Success
+      this.showDialog = false;
+      location.reload();
+    }
+  }
+});
+```
+
+<Note>
+  The `option: 'CREATE'` parameter is used for both creating and updating companies. The backend determines the operation based on `companyId` (0 = create, >0 = update).
+</Note>
+
+## Permission Requirements
+
+The component implements role-based access control:
+
+```typescript
+private applyPermissions(): void {
+  const moduleName = 'Compañias';
+  const permission = this.permissions.find((p) => 
+    p.module === moduleName
+  );
+  
+  this.canView = permission.canView;      // View company list
+  this.canCreate = permission.canCreate;  // Create new company
+  this.canEdit = permission.canEdit;      // Edit existing company
+  this.canDelete = permission.canDelete;  // Delete company
+  this.canExport = permission.canExport;  // Export to Excel/CSV
+}
+```
+
+UI elements are conditionally rendered based on these permissions:
+
+```html
+<button *ngIf="canCreate" (click)="openNewDialog()">New Company</button>
+<button *ngIf="canEdit" (click)="editCompany(company)">Edit</button>
+<button *ngIf="canDelete" (click)="deleteCompany(company)">Delete</button>
+```
+
+## Multi-Tenant Architecture
+
+Each company in the system is a separate tenant:
+
+- **Isolated Data**: Each company has its own products, sales, users
+- **Shared Infrastructure**: All companies use the same application instance
+- **Company ID**: Used as a foreign key in all related tables
+- **Session Context**: Users log in to a specific company
+
+```typescript
+const session = this.authService.getSession();
+const { userId, companiaId } = session;
+
+// All subsequent queries are scoped to this companiaId
+this.masterService.getProducts(companiaId);
+this.masterService.getSales(companiaId);
+```
+
+## UI Components
+
+PrimeNG components used:
+
+- **Table**: Display companies with sorting and filtering
+- **Dialog**: Modal form for create/edit
+- **InputText**: Text fields for NIT, name, email, address
+- **Button**: Action buttons with icons
+- **Tooltip**: Helper text on hover
+- **Toast**: Success/error notifications
+- **ConfirmDialog**: Deletion confirmation
+
+## Best Practices
+
+<Info>
+  **Use unique NITs**: Ensure each company has a unique tax identification number to avoid conflicts.
+</Info>
+
+<Warning>
+  **Verify tax IDs**: Validate NIT format and verification digits according to your country's tax authority rules.
+</Warning>
+
+<Note>
+  **Brand consistency**: Upload high-quality logos that represent your brand well on receipts and invoices.
+</Note>
+
+## Troubleshooting
+
+### Company Not Saving
+- Check that NIT, Verification Digit, and Business Name are filled
+- Verify your user has `canCreate` or `canEdit` permission
+- Check browser console for API errors
+
+### Image Not Displaying
+- Ensure image file is not corrupted
+- Check that Base64 string is properly formatted
+- Try a smaller image (< 500KB recommended)
+
+### Can't Delete Company
+- Check if the company has associated data (users, sales, products)
+- Ensure you have `canDelete` permission
+- Backend may prevent deletion if data integrity would be violated
+
+### Page Reloads After Save
+- This is intentional behavior (`location.reload()` at line 215)
+- Ensures fresh data from the server
+- Consider implementing optimistic updates for better UX
+
+## Code Reference
+
+Key implementation files:
+
+- Component: `company.component.ts:26-248`
+- Interface: `api/master.ts:1-18`
+- Validation: `company.component.ts:172-183`
+- Image Upload: `company.component.ts:160-170`
+- Permissions: `company.component.ts:86-109`

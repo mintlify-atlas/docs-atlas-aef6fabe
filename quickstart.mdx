@@ -1,80 +1,338 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start Guide
+description: Get Karma POS running in minutes with this step-by-step guide
 ---
 
-## Get started in three steps
+# Quick Start Guide
 
-Get your documentation site running locally and make your first customization.
+Get Karma POS up and running in just a few minutes. This guide will walk you through the essential steps to start using the system.
 
-### Step 1: Set up your local environment
+## Prerequisites
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+Before you begin, ensure you have the following installed:
 
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+- **Node.js**: Version 24.x or higher (tested with v24.13.1)
+- **npm**: Comes with Node.js
+- **Git**: For cloning the repository
+- **Modern Browser**: Chrome, Firefox, Edge, or Safari
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+Karma POS requires Node.js 24+ and Angular CLI 19+ to function properly.
 </Note>
+
+## Installation in 3 Steps
+
+<Steps>
+
+### Install Dependencies
+
+First, navigate to the project directory and install all required dependencies:
+
+```bash
+npm install
+```
+
+This will install:
+- Angular 19 framework and router
+- PrimeNG 19 UI components
+- TailwindCSS for styling
+- RxJS for reactive programming
+- SignalR for real-time updates
+- Additional utilities (jsPDF, xlsx, crypto-js, etc.)
+
+### Start the Development Server
+
+Launch the development server with:
+
+```bash
+npm start
+```
+
+Or use the Angular CLI directly:
+
+```bash
+ng serve
+```
+
+The application will start at `http://localhost:4200/` and automatically reload when you make changes to the source files.
+
+### Access the Application
+
+Open your browser and navigate to:
+
+```
+http://localhost:4200/
+```
+
+You'll be presented with the login screen. Use your credentials to access the system.
+
+</Steps>
+
+## Initial Setup
+
+On first launch, you'll need to complete the initial setup:
+
+<Steps>
+
+### Company Configuration
+
+Navigate to the initial setup page to configure your company information:
+
+- Company name and details
+- Tax identification (NIT)
+- Business address
+- Contact information
+
+### User Permissions
+
+Set up user roles and permissions for your team:
+
+- Create user accounts
+- Assign module permissions (View, Create, Edit, Delete, Export)
+- Configure access to:
+  - Punto de Venta (POS)
+  - Compras (Purchases)
+  - Inventario (Inventory)
+  - Proveedores (Suppliers)
+  - Informes & KPIs (Reports)
+  - And more...
+
+### Inventory Setup
+
+Configure your initial inventory:
+
+1. **Categories**: Create product categories
+2. **Warehouses**: Set up warehouse/location tracking
+3. **Products**: Add your products with:
+   - Product name and code
+   - Barcode (optional)
+   - Price and cost
+   - Stock quantity
+   - Category assignment
+   - Unit of measure
+
+</Steps>
+
+## First Sale
+
+Now you're ready to process your first sale! Here's how:
+
+<Steps>
+
+### Navigate to POS
+
+From the main menu, click **"Punto de Venta"** (Point of Sale) or use the direct route:
+
+```
+http://localhost:4200/pages/pos
+```
+
+### Add Products
+
+There are three ways to add products to the cart:
+
+<CodeGroup>
+
+```typescript Barcode Scanner
+// Focus the barcode input field and scan
+// The system automatically searches and adds the product
+```
+
+```typescript Product Code
+// Type the product code in the search field
+// Press Enter to add to cart
+```
+
+```typescript Product Search (F2)
+// Press F2 to open the product search dialog
+// Browse or search for products
+// Click to add to cart
+```
+
+</CodeGroup>
+
+<Tip>
+Use keyboard shortcuts for faster operations:
+- **F2**: Open product search
+- **F3**: Open payment dialog
+- **F4**: Process sale
+- **F5**: Create new invoice
+</Tip>
+
+### Adjust Quantities
+
+Modify product quantities directly in the cart. The system automatically:
+
+- Validates available stock
+- Reserves inventory in real-time
+- Prevents overselling
+- Updates totals instantly
+
+### Process Payment (F3)
+
+Press **F3** or click the payment button to open the payment dialog:
+
+1. **Select Payment Method**:
+   - Cash (Efectivo)
+   - Card (Tarjeta)
+   - Financing (Financiación)
+   - Mixed payments (multiple methods)
+
+2. **Enter Amount**: The system calculates change automatically
+
+3. **Optional**: Select or create a customer
+
+4. **Confirm Sale**: Press **F4** or click "Procesar Venta"
+
+### Generate Invoice
+
+After processing, the system:
+
+- Creates a numbered invoice (e.g., FV-001)
+- Generates a PDF invoice
+- Updates inventory
+- Records the transaction
+- Shows the invoice preview
+
+</Steps>
+
+## Key Features at a Glance
+
+### Real-Time Stock Management
+
+Karma POS uses intelligent stock reservation:
+
+```typescript
+// When you add a product to cart
+1. System checks available stock
+2. Reserves the quantity for this invoice
+3. Other users see reduced available stock
+4. Stock is released if you remove the product
+5. Stock is permanently deducted on sale completion
+```
+
+<Warning>
+If you try to add more than available stock, the system will warn you and prevent the addition.
+</Warning>
+
+### Multi-Invoice Management
+
+Handle multiple customers simultaneously:
+
+- Press **F5** to create a new invoice tab
+- Switch between invoices by clicking the tabs
+- Each invoice has its own cart and customer
+- Stock reservations are tracked per invoice
+
+### Discounts
+
+Apply discounts at two levels:
+
+1. **Product Discount**: Individual item discounts (already configured on products)
+2. **General Discount**: Apply a percentage discount to the entire invoice
+
+## Available Scripts
+
+Here are the npm scripts available in Karma POS:
+
+<CodeGroup>
+
+```bash Development Server
+npm start
+# Starts development server at http://localhost:4200/
+```
+
+```bash Production Build
+npm run build
+# Builds optimized production bundle to dist/
+```
+
+```bash Watch Mode
+npm run watch
+# Builds in development mode with file watching
+```
+
+```bash Code Formatting
+npm run format
+# Formats all .ts, .js, and .html files with Prettier
+```
+
+```bash Unit Tests
+npm test
+# Runs unit tests with Karma test runner
+```
+
+</CodeGroup>
+
+## Common Workflows
+
+### Processing a Quick Sale
+
+1. Scan/enter product barcode
+2. Adjust quantity if needed
+3. Press **F3** for payment
+4. Enter amount (cash)
+5. Press **F4** to complete
+6. Print/email invoice
+
+### Creating a Quote
+
+1. Add products to cart
+2. Select customer
+3. Navigate to **"Cotizaciones"** (Quotes)
+4. Convert to invoice when ready
+
+### Checking Inventory
+
+1. Navigate to **"Inventario"** (Inventory)
+2. View stock levels by warehouse
+3. Check **"Stock Bajo"** (Low Stock) for alerts
+4. Create purchase orders as needed
+
+## Module Overview
+
+Karma POS includes these main modules:
+
+<CardGroup cols={2}>
+  <Card title="Punto de Venta" icon="cash-register">
+    Process sales, manage invoices, handle payments
+  </Card>
+  <Card title="Inventario" icon="boxes">
+    Track products, stock levels, and warehouses
+  </Card>
+  <Card title="Compras" icon="shopping-cart">
+    Create purchase orders and manage suppliers
+  </Card>
+  <Card title="Clientes" icon="users">
+    Customer database and transaction history
+  </Card>
+  <Card title="Informes" icon="chart-bar">
+    Sales reports, KPIs, and business analytics
+  </Card>
+  <Card title="Caja" icon="calculator">
+    Cash register management and accounting
+  </Card>
+  <Card title="Promociones" icon="tag">
+    Create and manage promotional campaigns
+  </Card>
+  <Card title="Permisos" icon="shield">
+    User roles and access control
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/installation">
+    Learn about detailed installation and configuration options
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference">
+    Explore the API endpoints and service methods
+  </Card>
+</CardGroup>
+
+---
+
+<Info>
+For issues or questions, check the console logs at `http://localhost:4200` or review the API responses in the browser's Network tab.
+</Info>

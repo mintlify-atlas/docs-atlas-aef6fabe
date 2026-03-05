@@ -1,0 +1,631 @@
+---
+title: 'WhatsApp Business Integration'
+description: 'Multi-agent WhatsApp messaging platform for customer support'
+icon: 'whatsapp'
+---
+
+# WhatsApp Business Integration
+
+Integrate WhatsApp Business API to provide multi-agent customer support directly from your POS system. Handle conversations, send messages, share media files, and manage customer interactions in real-time.
+
+## Business Value
+
+<CardGroup cols={2}>
+  <Card title="Multi-Agent Support" icon="users">
+    Multiple agents can manage conversations simultaneously
+  </Card>
+  <Card title="Real-time Messaging" icon="bolt">
+    SignalR-powered real-time message delivery and notifications
+  </Card>
+  <Card title="Rich Media Support" icon="images">
+    Send and receive images, documents, audio, and video files
+  </Card>
+  <Card title="Conversation Management" icon="list-check">
+    Track conversation status and assign agents dynamically
+  </Card>
+</CardGroup>
+
+## Architecture
+
+### WhatsApp Business API Integration
+
+The system integrates with the official WhatsApp Business API:
+
+```typescript
+export interface PhoneNumbers {
+  rowId: number;
+  phoneNumberId: string;        // WhatsApp Business Phone ID
+  displayPhoneNumber: string;   // Display number (e.g., +57 300 123 4567)
+  verifyToken: string;          // Webhook verification token
+  accessToken: string;          // API access token
+  name: string;                 // Business account name
+  state: boolean;               // Active/inactive
+  isBot: boolean;               // Enable AI bot responses
+}
+```
+
+### Real-time Communication
+
+The module uses SignalR for real-time message delivery:
+
+```typescript
+import { SignalrService } from '../../services/signalr.service';
+
+ngOnInit(): void {
+  this.signalRService.connect();
+  
+  this.signalRService.messageArrived$.subscribe(({ phoneNumberId }) => {
+    this.onNewMessage(phoneNumberId);
+  });
+}
+
+onPhoneNumberChange() {
+  if (!this.selectedPhoneNumber) return;
+  
+  this.signalRService.joinPhoneGroup(this.selectedPhoneNumber.phoneNumberId);
+  this.loadConversations(this.selectedPhoneNumber.phoneNumberId);
+}
+
+ngOnDestroy(): void {
+  if (this.selectedPhoneNumber) {
+    this.signalRService.leavePhoneGroup(this.selectedPhoneNumber.phoneNumberId);
+  }
+  this.signalRService.disconnect();
+}
+```
+
+## Data Models
+
+### Conversation Structure
+
+```typescript
+export type ConversationStatus = 'open' | 'in_progress' | 'closed' | 'pending';
+
+export interface Conversation {
+  id: number;
+  clientPhone: string;
+  clientName: string;
+  hasUnreadMessages?: boolean;
+  status: ConversationStatus;
+  assignedAgentId: number | null;
+  lockedByAgentId: number | null;
+  lastMessage: string;
+  updatedAt: string;
+  messages: Message[];
+}
+```
+
+### Message Types
+
+```typescript
+export type MessageType = 'TEXT' | 'IMAGE' | 'DOCUMENT' | 'AUDIO' | 'VIDEO' | 'TEMPLATE';
+export type MessageFrom = 'client' | 'agent' | 'system';
+
+export interface Message {
+  id: number;
+  from: MessageFrom;
+  type: MessageType;
+  timestamp: string;
+  templateName?: string;
+  text?: string;
+  mediaUrl?: string;
+  fileName?: string;
+  mimeType?: string;
+  status?: string;
+  agentId?: number;
+}
+```
+
+## Implementation Guide
+
+<Steps>
+  <Step title="Configure WhatsApp Business API">
+    Set up your WhatsApp Business API credentials:
+    
+    - Phone Number ID from Meta Business Manager
+    - Access Token from Meta Developer Portal
+    - Webhook verification token
+    - Configure webhook URL for incoming messages
+  </Step>
+
+  <Step title="Load Phone Numbers">
+    Retrieve configured WhatsApp Business accounts:
+    
+    ```typescript
+    loadPhoneNumbers() {
+      this.whatsappService.getByPhoneNumbers().subscribe({
+        next: (res) => {
+          if (res.code === 0) {
+            this.phoneNumbers = res.data || [];
+          }
+        }
+      });
+    }
+    ```
+  </Step>
+
+  <Step title="Load Conversations">
+    Fetch conversations for the selected phone number:
+    
+    ```typescript
+    loadConversations(phoneNumberId?: string) {
+      this.whatsappService.getConversations(phoneNumberId).subscribe({
+        next: (res) => {
+          if (res.code === 0) {
+            this.conversations = res.data || [];
+            this.loadAgents();
+          }
+        }
+      });
+    }
+    ```
+  </Step>
+
+  <Step title="Select and Lock Conversation">
+    When an agent selects a conversation, lock it to prevent conflicts:
+    
+    ```typescript
+    selectConversation(conv: Conversation): void {
+      if (!conv.lockedByAgentId) {
+        conv.lockedByAgentId = this.currentAgentId;
+        conv.status = 'pending';
+      }
+      
+      this.activeConversation = conv;
+      this.loadMessages(conv.id);
+      this.shouldScroll = true;
+    }
+    ```
+  </Step>
+</Steps>
+
+## Sending Messages
+
+### Text Messages
+
+```typescript
+sendMessage() {
+  if (!this.messageText && this.selectedFiles.length === 0) return;
+  
+  const formData = new FormData();
+  formData.append('conversationId', this.activeConversation!.id.toString());
+  formData.append('senderUserId', this.userId.toString());
+  formData.append('companiaId', this.companiaId.toString());
+  formData.append('to', this.activeConversation!.clientPhone);
+  formData.append('phoneNumberId', this.selectedPhoneNumber!.phoneNumberId);
+  formData.append('accessToken', this.selectedPhoneNumber!.accessToken);
+  
+  if (this.messageText?.trim()) {
+    formData.append('messageText', this.messageText);
+  }
+  
+  // Add files
+  this.selectedFiles.forEach(file => {
+    formData.append('files', file);
+  });
+  
+  this.whatsappService.sendMessage(formData).subscribe({
+    next: (res) => {
+      if (res.code === 0) {
+        this.messageText = '';
+        this.selectedFiles = [];
+        this.loadMessages(this.activeConversation!.id);
+      }
+    }
+  });
+}
+```
+
+### Media Files
+
+Support for multiple file types with validation:
+
+```typescript
+MAX_FILES = 5;
+MAX_FILE_SIZE_MB = 10;
+
+onFilesSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  if (!input.files) return;
+  
+  const files = Array.from(input.files);
+  
+  for (const file of files) {
+    if (this.selectedFiles.length >= this.MAX_FILES) {
+      alert('Máximo 5 archivos por envío');
+      break;
+    }
+    
+    const sizeMB = file.size / 1024 / 1024;
+    if (sizeMB > this.MAX_FILE_SIZE_MB) {
+      alert(`El archivo ${file.name} supera los ${this.MAX_FILE_SIZE_MB}MB`);
+      continue;
+    }
+    
+    this.selectedFiles.push(file);
+    
+    // Preview for images
+    if (file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      this.previewImages.push({ file, url });
+    }
+  }
+  
+  this.showPreviewModal = true;
+}
+```
+
+### File Type Icons
+
+```typescript
+getFileIcon(file: File): string {
+  const type = file.type;
+  
+  if (type.startsWith('image/')) return 'pi pi-image text-blue-500';
+  if (type.startsWith('audio/')) return 'pi pi-volume-up text-purple-500';
+  if (type === 'application/pdf') return 'pi pi-file-pdf text-red-500';
+  if (type.includes('word')) return 'pi pi-file-word text-blue-600';
+  if (type.includes('excel')) return 'pi pi-file-excel text-green-600';
+  if (type.includes('powerpoint')) return 'pi pi-file-powerpoint text-orange-500';
+  if (type.includes('zip')) return 'pi pi-file-zip text-yellow-600';
+  
+  return 'pi pi-file text-gray-500';
+}
+```
+
+## Conversation Management
+
+### Status Workflow
+
+<Tabs>
+  <Tab title="Open">
+    New conversation, not yet assigned to an agent
+    
+    ```typescript
+    status: 'open'
+    lockedByAgentId: null
+    assignedAgentId: null
+    ```
+  </Tab>
+  
+  <Tab title="Pending">
+    Agent has viewed but not actively working on it
+    
+    ```typescript
+    status: 'pending'
+    lockedByAgentId: agentId
+    ```
+  </Tab>
+  
+  <Tab title="In Progress">
+    Agent is actively handling the conversation
+    
+    ```typescript
+    status: 'in_progress'
+    lockedByAgentId: agentId
+    ```
+  </Tab>
+  
+  <Tab title="Closed">
+    Conversation has been resolved
+    
+    ```typescript
+    status: 'closed'
+    lockedByAgentId: null
+    ```
+  </Tab>
+</Tabs>
+
+### Update Conversation Status
+
+```typescript
+updateStatus(conv: Conversation): void {
+  if (!conv) return;
+  
+  // If closing, release the lock
+  if (conv.status === 'closed') {
+    conv.lockedByAgentId = null;
+  }
+  
+  conv.updatedAt = new Date().toISOString();
+  
+  // API call to persist changes
+}
+
+statusOptions = [
+  { label: 'Abierto', value: 'open' },
+  { label: 'En progreso', value: 'in_progress' },
+  { label: 'Cerrado', value: 'closed' }
+];
+```
+
+### Permission Control
+
+Only the agent who locked the conversation can write messages:
+
+```typescript
+canWrite(conv: Conversation): boolean {
+  return conv.lockedByAgentId === this.currentAgentId && 
+         conv.status !== 'closed';
+}
+```
+
+## Quick Replies
+
+Pre-configured quick response templates:
+
+```typescript
+quickRepliesList = [
+  'Hola 👋 ¿En qué puedo ayudarte?',
+  'Ya reviso tu caso, dame un momento por favor',
+  '¿Podrías enviarme un poco más de información?',
+  'Gracias por comunicarte con nosotros 😊'
+];
+
+selectQuickReply(text: string, popover: any) {
+  this.messageText = text;
+  popover.hide();
+}
+```
+
+## WhatsApp Templates
+
+Send pre-approved WhatsApp templates for marketing messages:
+
+```typescript
+templateOptions = [
+  { label: 'Saludo inicial', value: 'WELCOME' },
+  { label: 'Seguimiento pedido', value: 'ORDER_FOLLOWUP' },
+  { label: 'Cierre de conversación', value: 'CLOSING' }
+];
+
+sendTemplate(): void {
+  if (!this.selectedTemplate || !this.activeConversation) return;
+  
+  this.activeConversation.messages.push({
+    id: Date.now(),
+    from: 'agent',
+    type: 'TEMPLATE',
+    templateName: this.selectedTemplate,
+    timestamp: new Date().toISOString(),
+    status: 'SENT'
+  });
+  
+  this.selectedTemplate = null;
+}
+```
+
+<Note>
+  **WhatsApp 24-hour Window**: After 24 hours of no client message, only approved templates can be sent.
+</Note>
+
+### Check 24-hour Window
+
+```typescript
+is24hWindowOpen(): boolean {
+  const lastClientMessage = [...this.messages]
+    .reverse()
+    .find(m => m.from === 'client');
+  
+  if (!lastClientMessage) return false;
+  
+  const lastTime = new Date(lastClientMessage.timestamp).getTime();
+  const now = Date.now();
+  const hoursDiff = (now - lastTime) / (1000 * 60 * 60);
+  
+  return hoursDiff <= 24;
+}
+```
+
+## Agent Management
+
+Load agents assigned to the selected phone number:
+
+```typescript
+loadAgents(): void {
+  if (!this.selectedPhoneNumber) return;
+  
+  this.whatsappService.getAgentsByPhoneNumberId(
+    this.selectedPhoneNumber.phoneNumberId
+  ).subscribe({
+    next: (res: any) => {
+      this.agents = res.data || [];
+    }
+  });
+}
+
+getAgentName(id: number | null): string {
+  return this.agents.find(agent => agent.id === id)?.name || 'Sin asignar';
+}
+```
+
+## UI Features
+
+### Status Badges
+
+```typescript
+statusSeverity(status: ConversationStatus): 
+  'success' | 'info' | 'warn' | 'secondary' {
+  switch (status) {
+    case 'open': return 'warn';
+    case 'pending': return 'secondary';
+    case 'in_progress': return 'info';
+    case 'closed': return 'success';
+    default: return 'secondary';
+  }
+}
+```
+
+### Image Preview
+
+```typescript
+openImage(url?: string) {
+  this.selectedImage = url;
+  this.showImageModal = true;
+}
+```
+
+### Auto-scroll to Latest Message
+
+```typescript
+ngAfterViewChecked(): void {
+  if (this.shouldScroll) {
+    this.scrollToBottom();
+  }
+}
+
+scrollToBottom(): void {
+  try {
+    const el = this.messagesContainer.nativeElement;
+    el.scrollTop = el.scrollHeight;
+  } catch {}
+}
+```
+
+## WhatsApp Service API
+
+```typescript
+@Injectable({ providedIn: 'root' })
+export class WhatsappService {
+  private apiUrl = 'https://localhost:7197/api/';
+
+  getConversations(phoneNumberId?: string): 
+    Observable<ApiResponse<Conversation[]>> {
+    return this.http.get<ApiResponse<Conversation[]>>(
+      `${this.apiUrl}WhatsApp/GetConversations/${phoneNumberId}`
+    );
+  }
+
+  getByPhoneNumbers(): Observable<ApiResponse<PhoneNumbers[]>> {
+    return this.http.get<ApiResponse<PhoneNumbers[]>>(
+      `${this.apiUrl}WhatsApp/GetPhoneNumbers`
+    );
+  }
+
+  getMessagesByConversationId(conversationId: number): 
+    Observable<ApiResponse<Message[]>> {
+    return this.http.get<ApiResponse<Message[]>>(
+      `${this.apiUrl}WhatsApp/GetMessagesByConversationId/${conversationId}`
+    );
+  }
+
+  sendMessage(payload: FormData): Observable<ApiResponse<number>> {
+    return this.http.post<ApiResponse<number>>(
+      `${this.apiUrl}WhatsApp/SendMessage`, 
+      payload
+    );
+  }
+
+  getAgentsByPhoneNumberId(phoneNumberId: string) {
+    return this.http.get<any[]>(
+      `${this.apiUrl}WhatsApp/GetAgentsByPhoneNumberId/${phoneNumberId}`
+    );
+  }
+}
+```
+
+## Digital Ocean Integration
+
+The module integrates with Digital Ocean Spaces for media storage:
+
+```typescript
+digitalOcean: DigitalOceanSettings = {
+  accessKey: '',
+  secretKey: '',
+  serviceUrl: '',
+  bucketName: '',
+  url: ''
+};
+
+loadSettings() {
+  this.masterService.getConfiguration(this.companiaId).subscribe({
+    next: (res) => {
+      if (res.code === 0 && res.data) {
+        this.digitalOcean = {
+          accessKey: res.data.accessKey,
+          secretKey: res.data.secretKey,
+          serviceUrl: res.data.serviceUrl,
+          bucketName: res.data.bucketName,
+          url: res.data.url
+        };
+      }
+    }
+  });
+}
+```
+
+## Permission System
+
+```typescript
+private applyPermissions(): void {
+  const moduleName = 'Chats';
+  const permission = this.permissions.find(p => p.module === moduleName);
+  
+  if (!permission) {
+    this.resetPermissions();
+    return;
+  }
+  
+  this.canView = permission.canView;
+  this.canCreate = permission.canCreate;
+  this.canEdit = permission.canEdit;
+  this.canDelete = permission.canDelete;
+  this.canExport = permission.canExport;
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Real-time Updates">
+    - Use SignalR for instant message delivery
+    - Join/leave phone groups appropriately
+    - Clean up connections on component destroy
+  </Accordion>
+  
+  <Accordion title="Conversation Locking">
+    - Lock conversations when agents select them
+    - Release locks when closing or reassigning
+    - Prevent multiple agents from writing simultaneously
+  </Accordion>
+  
+  <Accordion title="Media Handling">
+    - Validate file size and type before upload
+    - Limit number of files per message
+    - Store media in cloud storage (Digital Ocean Spaces)
+    - Generate thumbnails for images
+  </Accordion>
+  
+  <Accordion title="Performance">
+    - Lazy load message history
+    - Implement virtual scrolling for long conversations
+    - Cache conversation data
+    - Optimize image loading
+  </Accordion>
+</AccordionGroup>
+
+## Required PrimeNG Modules
+
+```typescript
+imports: [
+  CommonModule,
+  FormsModule,
+  CardModule,
+  BadgeModule,
+  ButtonModule,
+  InputTextModule,
+  DropdownModule,
+  DialogModule,
+  TableModule,
+  CalendarModule,
+  TooltipModule
+]
+```
+
+## Reference
+
+- Component: `~/workspace/source/src/app/components/pages/whatsapp-multiagent/whatsapp-multiagent.component.ts`
+- Lines: 1-707
+- Service: `~/workspace/source/src/app/components/services/whatsapp.service.ts`
+- Interfaces: `~/workspace/source/src/app/components/pages/api/whatsappagents.ts`
+- External Dependencies: WhatsApp Business API, SignalR, Digital Ocean Spaces

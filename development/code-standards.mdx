@@ -1,0 +1,670 @@
+---
+title: Code Standards & Linting
+description: Code quality guidelines, ESLint configuration, and Prettier formatting rules
+---
+
+## Overview
+
+The project enforces code quality through:
+
+- **ESLint** - Code linting and quality checks
+- **Prettier** - Code formatting
+- **TypeScript** - Static type checking
+- **Angular Style Guide** - Component and architecture patterns
+
+## ESLint Configuration
+
+The project uses ESLint v9.14.0 with Angular-specific rules.
+
+### Configuration File
+
+**Location**: `eslint.config.js`
+
+<CodeGroup>
+```javascript eslint.config.js
+export default {
+    root: true,
+    ignorePatterns: ['**/dist/**'],
+    plugins: ['prettier'],
+    extends: ['prettier'],
+    rules: {
+        'padding-line-between-statements': [
+            'error',
+            { blankLine: 'always', prev: ['const', 'let', 'var'], next: '*' },
+            { blankLine: 'any', prev: ['const', 'let', 'var'], next: ['const', 'let', 'var'] },
+            { blankLine: 'always', prev: '*', next: 'return' },
+            { blankLine: 'always', prev: 'block', next: '*' },
+            { blankLine: 'always', prev: '*', next: 'block' }
+        ]
+    },
+    overrides: [
+        {
+            files: ['*.ts'],
+            extends: [
+                'eslint:recommended',
+                'plugin:@typescript-eslint/recommended',
+                'plugin:@angular-eslint/recommended',
+                'prettier'
+            ],
+            rules: {
+                '@angular-eslint/component-selector': [
+                    'error',
+                    {
+                        type: 'element',
+                        prefix: 'p',
+                        style: 'kebab-case'
+                    }
+                ],
+                '@angular-eslint/directive-selector': [
+                    'error',
+                    {
+                        type: 'attribute',
+                        prefix: 'p',
+                        style: 'camelCase'
+                    }
+                ],
+                '@typescript-eslint/no-explicit-any': 'off',
+                'arrow-body-style': ['error', 'as-needed'],
+                'prefer-const': 0
+            }
+        }
+    ]
+};
+```
+</CodeGroup>
+
+### Key ESLint Rules
+
+**Component Selectors**:
+- **Prefix**: `p` (e.g., `<p-button>`, `<p-table>`)
+- **Style**: `kebab-case`
+- **Type**: Element selector
+
+**Directive Selectors**:
+- **Prefix**: `p`
+- **Style**: `camelCase`
+- **Type**: Attribute selector
+
+**Code Style**:
+- **Blank Lines**: Required before returns, blocks, and after variable declarations
+- **Arrow Functions**: Use concise body when possible
+- **No Explicit Any**: Disabled (allowed)
+- **Prefer Const**: Disabled (let is allowed)
+
+## Prettier Configuration
+
+Prettier handles automatic code formatting.
+
+### Configuration File
+
+**Location**: `.prettierrc.json`
+
+<CodeGroup>
+```json .prettierrc.json
+{
+    "useTabs": false,
+    "tabWidth": 4,
+    "trailingComma": "none",
+    "semi": true,
+    "singleQuote": true,
+    "printWidth": 250,
+    "bracketSameLine": false,
+    "overrides": [
+        {
+            "files": ["*.ts", "*.mts", "*.d.ts"],
+            "options": {
+                "parser": "typescript"
+            }
+        },
+        {
+            "files": ["*.html"],
+            "options": {
+                "parser": "html"
+            }
+        },
+        {
+            "files": ["*.component.html"],
+            "options": {
+                "parser": "angular"
+            }
+        }
+    ]
+}
+```
+</CodeGroup>
+
+### Formatting Rules
+
+| Rule | Value | Description |
+|------|-------|-------------|
+| **Tab Width** | 4 spaces | Indentation size |
+| **Quotes** | Single | Use single quotes for strings |
+| **Semicolons** | Always | Require semicolons |
+| **Print Width** | 250 | Maximum line length |
+| **Trailing Comma** | None | No trailing commas |
+| **Tabs** | Spaces | Use spaces, not tabs |
+
+### Running Prettier
+
+Format all code:
+
+```bash
+npm run format
+```
+
+This runs:
+```bash
+prettier --write "**/*.{js,mjs,ts,mts,d.ts,html}" --cache
+```
+
+<Tip>
+Prettier caches results for faster subsequent runs. The cache is automatically managed.
+</Tip>
+
+## TypeScript Standards
+
+### Strict Mode Settings
+
+The project uses strict TypeScript configuration:
+
+```json
+{
+    "compilerOptions": {
+        "strict": true,
+        "noImplicitOverride": true,
+        "noPropertyAccessFromIndexSignature": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true
+    }
+}
+```
+
+### Type Annotations
+
+Always specify types explicitly:
+
+<CodeGroup>
+```typescript Good
+// Explicit types
+const users: User[] = [];
+const isLoading: boolean = false;
+const selectedId: number | null = null;
+
+function getUser(id: number): Observable<User> {
+    return this.http.get<User>(`/api/users/${id}`);
+}
+```
+
+```typescript Bad
+// Implicit any types
+const users = [];
+let isLoading;
+const selectedId = null;
+
+function getUser(id) {
+    return this.http.get(`/api/users/${id}`);
+}
+```
+</CodeGroup>
+
+### Interfaces and Types
+
+Define interfaces for all data structures:
+
+```typescript
+// User interface
+export interface User {
+    userId: number;
+    username: string;
+    email: string;
+    role: UserRole;
+    isActive: boolean;
+    createdAt: Date;
+}
+
+// Type alias for union types
+export type UserRole = 'admin' | 'user' | 'guest';
+
+// Response wrapper
+export interface ApiResponse<T> {
+    code: number;
+    message: string;
+    data: T | null;
+}
+```
+
+## Angular Code Standards
+
+### Component Structure
+
+Follow a consistent component structure:
+
+```typescript
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+
+// 1. Angular imports
+// 2. Third-party imports
+// 3. Application imports
+
+@Component({
+    selector: 'app-example',
+    standalone: true,
+    imports: [CommonModule],
+    templateUrl: './example.component.html',
+    styleUrl: './example.component.scss'
+})
+export class ExampleComponent implements OnInit {
+    // 1. Public static fields
+    // 2. Private static fields
+    // 3. Public instance fields
+    // 4. Private instance fields
+    
+    // Public properties
+    users: User[] = [];
+    isLoading: boolean = false;
+    
+    // Private properties
+    private companiaId: number = 1;
+    
+    // 5. Constructor
+    constructor(
+        private userService: UserService,
+        private messageService: MessageService
+    ) {}
+    
+    // 6. Lifecycle hooks
+    ngOnInit(): void {
+        this.loadUsers();
+    }
+    
+    // 7. Public methods
+    public loadUsers(): void {
+        this.isLoading = true;
+        this.userService.getUsers().subscribe({
+            next: (response) => this.handleSuccess(response),
+            error: (error) => this.handleError(error)
+        });
+    }
+    
+    // 8. Private methods
+    private handleSuccess(response: ApiResponse<User[]>): void {
+        this.users = response.data || [];
+        this.isLoading = false;
+    }
+    
+    private handleError(error: any): void {
+        this.isLoading = false;
+        this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Failed to load users'
+        });
+    }
+}
+```
+
+### Member Ordering
+
+ESLint enforces member ordering:
+
+```typescript
+export class ExampleComponent {
+    // 1. Public static fields
+    public static readonly VERSION = '1.0.0';
+    
+    // 2. Static fields
+    static defaultConfig = {};
+    
+    // 3. Instance fields
+    users: User[] = [];
+    private companiaId: number = 1;
+    
+    // 4. Constructor
+    constructor() {}
+    
+    // 5. Public instance methods
+    public loadData(): void {}
+    
+    // 6. Private instance methods
+    private handleError(): void {}
+}
+```
+
+### Component Naming
+
+<CodeGroup>
+```typescript Component Class
+// Use PascalCase with descriptive names
+export class CustomersComponent { }
+export class UserProfileComponent { }
+export class ProductCardComponent { }
+```
+
+```typescript Component Selector
+// Use kebab-case with app prefix
+@Component({
+    selector: 'app-customers'
+})
+
+@Component({
+    selector: 'app-user-profile'
+})
+```
+
+```typescript File Names
+// Use kebab-case with component suffix
+customers.component.ts
+user-profile.component.ts
+product-card.component.ts
+```
+</CodeGroup>
+
+## Code Formatting Standards
+
+### Indentation and Spacing
+
+```typescript
+// 4 spaces for indentation
+function example(): void {
+    if (condition) {
+        doSomething();
+    }
+}
+
+// Blank line before return
+function calculate(): number {
+    const result = 10 + 20;
+
+    return result;
+}
+
+// Blank line after variable declarations
+const users: User[] = [];
+const isLoading: boolean = false;
+
+if (users.length > 0) {
+    // Process users
+}
+```
+
+### Import Organization
+
+```typescript
+// 1. Angular core imports
+import { Component, OnInit, Input, Output } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+
+// 2. Third-party library imports
+import { MessageService } from 'primeng/api';
+import { ButtonModule } from 'primeng/button';
+import { TableModule } from 'primeng/table';
+
+// 3. Application imports - Services
+import { MasterService } from '../../services/master.service';
+import { AuthService } from '../core/guards/auth.service';
+
+// 4. Application imports - Interfaces/Types
+import { User, Permission } from '../api/permissions';
+import { ApiResponse } from '../api/common';
+```
+
+### String Formatting
+
+```typescript
+// Use single quotes
+const message = 'Hello World';
+
+// Template literals for interpolation
+const greeting = `Hello, ${userName}`;
+
+// Multi-line strings
+const html = `
+    <div>
+        <p>Content</p>
+    </div>
+`;
+```
+
+### Array and Object Literals
+
+```typescript
+// Arrays
+const numbers: number[] = [1, 2, 3, 4, 5];
+const users: User[] = [];
+
+// Objects - no trailing commas
+const config = {
+    timeout: 5000,
+    retries: 3,
+    debug: false
+};
+
+// Multi-line objects
+const user: User = {
+    id: 1,
+    name: 'John Doe',
+    email: 'john@example.com',
+    isActive: true
+};
+```
+
+## RxJS Standards
+
+### Observable Subscriptions
+
+```typescript
+import { Subscription } from 'rxjs';
+
+export class ExampleComponent implements OnInit, OnDestroy {
+    private subscriptions = new Subscription();
+    
+    ngOnInit(): void {
+        // Add subscriptions
+        this.subscriptions.add(
+            this.userService.getUsers().subscribe({
+                next: (users) => this.users = users,
+                error: (error) => this.handleError(error)
+            })
+        );
+    }
+    
+    ngOnDestroy(): void {
+        // Unsubscribe all
+        this.subscriptions.unsubscribe();
+    }
+}
+```
+
+### Observable Error Handling
+
+```typescript
+this.userService.getUsers().subscribe({
+    next: (response) => {
+        this.users = response.data || [];
+        this.isLoading = false;
+    },
+    error: (error) => {
+        console.error('Failed to load users:', error);
+        this.isLoading = false;
+        this.showError('Failed to load users');
+    }
+});
+```
+
+## Permissions Pattern
+
+Implement permission checks consistently:
+
+```typescript
+export class ExampleComponent implements OnInit {
+    // Permission flags
+    canView = false;
+    canCreate = false;
+    canEdit = false;
+    canDelete = false;
+    canExport = false;
+    
+    private permissions: Permission[] = [];
+    
+    ngOnInit(): void {
+        this.loadPermissions();
+    }
+    
+    private loadPermissions(): void {
+        const session = this.authService.getSession();
+        
+        if (!session) {
+            this.resetPermissions();
+            return;
+        }
+        
+        this.loginService.getPermissions(session.userId, session.companiaId)
+            .subscribe({
+                next: (permissions) => {
+                    this.permissions = permissions.data ?? [];
+                    this.applyPermissions();
+                },
+                error: () => this.resetPermissions()
+            });
+    }
+    
+    private applyPermissions(): void {
+        const moduleName = 'ModuleName';
+        const permission = this.permissions.find(p => p.module === moduleName);
+        
+        if (!permission) {
+            this.resetPermissions();
+            return;
+        }
+        
+        this.canView = permission.canView;
+        this.canCreate = permission.canCreate;
+        this.canEdit = permission.canEdit;
+        this.canDelete = permission.canDelete;
+        this.canExport = permission.canExport;
+    }
+    
+    private resetPermissions(): void {
+        this.canView = false;
+        this.canCreate = false;
+        this.canEdit = false;
+        this.canDelete = false;
+        this.canExport = false;
+    }
+}
+```
+
+## Git Commit Standards
+
+### Commit Message Format
+
+```bash
+# Format: <type>: <subject>
+
+feat: add user management module
+fix: resolve navigation issue in sidebar
+style: format code with prettier
+refactor: simplify user service logic
+docs: update API documentation
+test: add unit tests for auth service
+```
+
+### Commit Types
+
+| Type | Description |
+|------|-------------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `docs` | Documentation only |
+| `style` | Code style changes (formatting) |
+| `refactor` | Code refactoring |
+| `test` | Adding or updating tests |
+| `chore` | Build process or auxiliary tool changes |
+
+## Code Review Checklist
+
+<Steps>
+  <Step title="Code Quality">
+    - Code follows ESLint rules
+    - All files formatted with Prettier
+    - No console.log statements (use proper logging)
+    - No commented-out code
+  </Step>
+
+  <Step title="TypeScript">
+    - All types explicitly defined
+    - No use of `any` type (unless necessary)
+    - Interfaces defined for data structures
+    - Proper null/undefined handling
+  </Step>
+
+  <Step title="Angular">
+    - Component follows single responsibility
+    - Proper lifecycle hook usage
+    - Observables properly unsubscribed
+    - Standalone component imports correct
+  </Step>
+
+  <Step title="Testing">
+    - Unit tests included
+    - Tests pass successfully
+    - Code coverage acceptable
+  </Step>
+</Steps>
+
+## Best Practices
+
+<Tip>
+**Code Quality Tips**
+- Run `npm run format` before committing
+- Fix all ESLint warnings and errors
+- Write self-documenting code with clear variable names
+- Add JSDoc comments for public APIs
+- Keep functions small and focused
+</Tip>
+
+<Warning>
+**Avoid These Mistakes**
+- Don't disable ESLint rules without good reason
+- Don't use `any` type as a shortcut
+- Don't forget to unsubscribe from observables
+- Don't mix tabs and spaces
+- Don't commit commented-out code
+</Warning>
+
+## Editor Setup
+
+### VS Code Settings
+
+Create `.vscode/settings.json`:
+
+```json
+{
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": true
+    },
+    "[typescript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[html]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    }
+}
+```
+
+### Recommended Extensions
+
+- **ESLint** - `dbaeumer.vscode-eslint`
+- **Prettier** - `esbenp.prettier-vscode`
+- **Angular Language Service** - `Angular.ng-template`
+- **Tailwind CSS IntelliSense** - `bradlc.vscode-tailwindcss`
+
+## Next Steps
+
+- Review [Testing Guide](/development/testing)
+- Learn about [Build & Deployment](/development/deployment)
+- Understand [Application Architecture](/development/architecture)

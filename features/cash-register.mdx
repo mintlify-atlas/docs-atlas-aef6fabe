@@ -1,0 +1,526 @@
+---
+title: 'Cash Register'
+description: 'Daily cash register operations including opening balance, closing reconciliation, and transaction tracking'
+icon: 'cash-register'
+---
+
+# Cash Register Management
+
+The Cash Register module manages daily cash drawer operations, tracking opening balances, sales, and closing reconciliation with automatic variance calculation.
+
+## Overview
+
+This component provides a simple interface for opening and closing cash registers, tracking expected vs. actual balances, and maintaining a history of register operations.
+
+**Location**: `~/workspace/source/src/app/components/pages/cash-register/cash-register.component.ts`
+
+<Note>
+  This is a foundational implementation that tracks basic cash register operations. It currently uses local state and can be extended to integrate with backend services.
+</Note>
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Open/Close Operations" icon="door-open">
+    Simple workflow for opening registers with initial balance and closing with reconciliation
+  </Card>
+  <Card title="Multi-Register Support" icon="cash-register">
+    Manage multiple cash registers simultaneously
+  </Card>
+  <Card title="Variance Tracking" icon="calculator">
+    Automatic calculation of differences between expected and actual cash
+  </Card>
+  <Card title="Payment Method Breakdown" icon="credit-card">
+    Track both cash and card payments separately during closing
+  </Card>
+</CardGroup>
+
+## Cash Register Interface
+
+```typescript
+export interface CashRegister {
+    id: string;
+    name: string;
+    status: "open" | "closed";
+    openedAt: string;
+    closedAt?: string;
+    openingBalance: number;
+    expectedBalance: number;  // Opening + sales
+    actualBalance?: number;   // Counted at closing
+    difference?: number;      // Actual - expected
+    operator: string;
+}
+```
+**Source**: `src/app/components/pages/api/cash-register.ts:1-12`
+
+## Component Structure
+
+### Core Properties
+
+```typescript
+export class CashRegisterComponent implements OnInit {
+    showOpenDialog: boolean = false;
+    showCloseDialog: boolean = false;
+    
+    openingBalance: number | null = null;
+    actualCash: number | null = null;
+    actualCard: number | null = null;
+    
+    cashRegisters: CashRegister[] = [];
+    activeCashRegister: CashRegister | undefined;
+    
+    // Today's sales statistics
+    todaySales: number = 1047.5;
+    expectedCash: number = 650.25;
+    expectedCard: number = 397.25;
+}
+```
+**Source**: `cash-register.component.ts:29-63`
+
+## Opening a Cash Register
+
+<Steps>
+  <Step title="Click Open Register">
+    User clicks the "Abrir Caja" button which shows the opening dialog.
+  </Step>
+  
+  <Step title="Enter Opening Balance">
+    Enter the initial cash amount in the drawer:
+    
+    ```typescript
+    // Opening balance input is bound to this property
+    openingBalance: number | null = null;
+    ```
+  </Step>
+  
+  <Step title="Process Opening">
+    The system creates a new cash register record:
+    
+    ```typescript
+    handleOpenCashRegister(): void {
+        if (this.openingBalance === null || this.openingBalance <= 0) {
+            // Could add PrimeNG Toast notification here
+            return;
+        }
+        
+        const newCashRegister: CashRegister = {
+            id: String(Date.now()),
+            name: `Caja ${this.cashRegisters.length + 1}`,
+            status: "open",
+            openedAt: new Date().toISOString(),
+            openingBalance: this.openingBalance,
+            expectedBalance: this.openingBalance,  // Will increase with sales
+            operator: "Usuario Actual"
+        };
+        
+        this.cashRegisters = [newCashRegister, ...this.cashRegisters];
+        this.showOpenDialog = false;
+        this.openingBalance = null;
+        this.updateActiveCashRegister();
+    }
+    ```
+    **Source**: `cash-register.component.ts:84-105`
+  </Step>
+</Steps>
+
+<Info>
+  The `expectedBalance` starts equal to the `openingBalance` and would be updated as sales are processed throughout the day.
+</Info>
+
+## Closing a Cash Register
+
+<Steps>
+  <Step title="Initiate Closing">
+    User clicks the "Cerrar Caja" button to start the closing process.
+  </Step>
+  
+  <Step title="Count Cash and Cards">
+    Physically count the drawer and enter amounts:
+    - **Actual Cash**: Physical cash in the drawer
+    - **Actual Card**: Total card transactions (from payment terminal)
+    
+    ```typescript
+    actualCash: number | null = null;
+    actualCard: number | null = null;
+    ```
+  </Step>
+  
+  <Step title="Calculate Variance">
+    The system automatically calculates the difference:
+    
+    ```typescript
+    handleCloseCashRegister(): void {
+        if (!this.activeCashRegister || 
+            this.actualCash === null || 
+            this.actualCard === null) {
+            return;
+        }
+        
+        const totalActual = this.actualCash + this.actualCard;
+        const difference = totalActual - 
+            (this.activeCashRegister.expectedBalance || 0);
+        
+        this.cashRegisters = this.cashRegisters.map((cr) =>
+            cr.id === this.activeCashRegister?.id
+                ? {
+                    ...cr,
+                    status: "closed",
+                    closedAt: new Date().toISOString(),
+                    actualBalance: totalActual,
+                    difference: difference
+                  }
+                : cr
+        );
+        
+        console.log("Cerrando caja - Diferencia:", difference);
+        this.showCloseDialog = false;
+        this.actualCash = null;
+        this.actualCard = null;
+        this.updateActiveCashRegister();
+    }
+    ```
+    **Source**: `cash-register.component.ts:107-132`
+  </Step>
+  
+  <Step title="Review Results">
+    The closed register now shows:
+    - Opening balance
+    - Expected balance
+    - Actual balance
+    - **Difference** (positive = overage, negative = shortage)
+  </Step>
+</Steps>
+
+## Active Cash Register
+
+Only one cash register can be active (status: "open") at a time:
+
+```typescript
+updateActiveCashRegister(): void {
+    this.activeCashRegister = this.cashRegisters.find(
+        (cr) => cr.status === "open"
+    );
+}
+```
+**Source**: `cash-register.component.ts:68-70`
+
+<Warning>
+  Before opening a new register, ensure the current one is closed. The component only tracks one active register at a time.
+</Warning>
+
+## Display Utilities
+
+### Date Formatting
+
+```typescript
+formatDate(dateString: string | undefined): string {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleString('es-CO', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+```
+**Source**: `cash-register.component.ts:134-144`
+
+### Open Time Calculation
+
+```typescript
+getOpenTime(openedAt: string): string {
+    const openedDate = new Date(openedAt).getTime();
+    const now = Date.now();
+    const diffHours = Math.floor((now - openedDate) / (1000 * 60 * 60));
+    return `${diffHours}h`;
+}
+```
+**Source**: `cash-register.component.ts:146-151`
+
+## Icon Mapping
+
+The component uses PrimeNG icons for visual consistency:
+
+```typescript
+getPrimeIcon(iconName: string): string {
+    switch (iconName) {
+        case 'DollarSign': return 'pi pi-dollar';
+        case 'CheckCircle': return 'pi pi-check-circle';
+        case 'Banknote': return 'pi pi-money-bill';
+        case 'CreditCard': return 'pi pi-credit-card';
+        case 'AlertCircle': return 'pi pi-exclamation-circle';
+        default: return '';
+    }
+}
+```
+**Source**: `cash-register.component.ts:73-82`
+
+## Sample Data
+
+The component initializes with example cash registers:
+
+```typescript
+cashRegisters: CashRegister[] = [
+    {
+        id: "1",
+        name: "Caja Principal",
+        status: "open",
+        openedAt: "2024-01-15T08:00:00.000Z",
+        openingBalance: 200.0,
+        expectedBalance: 1247.5,
+        operator: "María González"
+    },
+    {
+        id: "2",
+        name: "Caja Secundaria",
+        status: "closed",
+        openedAt: "2024-01-14T08:00:00.000Z",
+        closedAt: "2024-01-14T20:00:00.000Z",
+        openingBalance: 150.0,
+        expectedBalance: 856.75,
+        actualBalance: 850.0,
+        difference: -6.75,  // $6.75 shortage
+        operator: "Carlos Pérez"
+    }
+];
+```
+**Source**: `cash-register.component.ts:35-57`
+
+<Note>
+  In production, this data would be loaded from a backend service and persisted to a database.
+</Note>
+
+## Integration Points
+
+### With POS System
+
+When a sale is completed in the POS, the cash register's `expectedBalance` should be updated:
+
+```typescript
+// Pseudocode - Not in current implementation
+function onSaleCompleted(saleTotal: number) {
+    if (this.activeCashRegister) {
+        this.activeCashRegister.expectedBalance += saleTotal;
+    }
+}
+```
+
+### With Invoice System
+
+Invoices could reference the active cash register ID for audit trail:
+
+```typescript
+// Pseudocode
+interface Invoice {
+    // ... other fields
+    cashRegisterId?: string;
+    shiftOperator?: string;
+}
+```
+
+## Variance Analysis
+
+### Understanding Differences
+
+<Tabs>
+  <Tab title="Positive Difference">
+    **Overage**: Actual balance is higher than expected.
+    
+    Possible causes:
+    - Cashier error (gave too little change)
+    - Unrecorded sale
+    - Counting error
+  </Tab>
+  
+  <Tab title="Negative Difference">
+    **Shortage**: Actual balance is lower than expected.
+    
+    Possible causes:
+    - Cashier error (gave too much change)
+    - Missing cash
+    - Unrecorded void/refund
+    - Counting error
+  </Tab>
+  
+  <Tab title="Zero Difference">
+    **Balanced**: Perfect match between expected and actual.
+    
+    This is the ideal scenario and indicates accurate transaction processing.
+  </Tab>
+</Tabs>
+
+### Acceptable Tolerances
+
+<Info>
+  Most businesses set an acceptable variance threshold (e.g., ±$5 or ±0.5%) to account for minor counting errors or unavoidable discrepancies.
+</Info>
+
+## Best Practices
+
+<Steps>
+  <Step title="Count Opening Balance">
+    Always count the opening balance with a witness and document it. Never assume the previous closing balance.
+  </Step>
+  
+  <Step title="Reconcile Throughout the Day">
+    For busy locations, consider mid-shift cash drops to reduce theft risk and closing time.
+  </Step>
+  
+  <Step title="Document Variances">
+    Create a log for significant variances with explanations and corrective actions.
+  </Step>
+  
+  <Step title="Separate Cash and Cards">
+    Always count and record cash and card totals separately for accurate reconciliation.
+  </Step>
+  
+  <Step title="Secure Storage">
+    Use a safe for opening balances and cash drops. Never leave large amounts in the register.
+  </Step>
+</Steps>
+
+## Extending the Component
+
+### Backend Integration
+
+To connect to a backend service:
+
+```typescript
+// Add to constructor
+constructor(private cashRegisterService: CashRegisterService) {}
+
+// Load registers from API
+ngOnInit(): void {
+    this.loadCashRegisters();
+}
+
+loadCashRegisters() {
+    this.cashRegisterService.getCashRegisters(this.companiaId).subscribe({
+        next: (res) => {
+            this.cashRegisters = res.data || [];
+            this.updateActiveCashRegister();
+        }
+    });
+}
+
+// Save register opening
+handleOpenCashRegister(): void {
+    const payload = {
+        companiaId: this.companiaId,
+        userId: this.userId,
+        openingBalance: this.openingBalance
+    };
+    
+    this.cashRegisterService.openRegister(payload).subscribe({
+        next: (res) => {
+            this.cashRegisters = [res.data, ...this.cashRegisters];
+            this.updateActiveCashRegister();
+        }
+    });
+}
+```
+
+### Sales Integration
+
+Update expected balance when sales occur:
+
+```typescript
+onSaleCompleted(invoice: Invoice) {
+    if (this.activeCashRegister) {
+        // Update expected balance based on payment methods
+        const cashPayment = invoice.paymentMethods
+            .filter(pm => pm.type === 'cash')
+            .reduce((sum, pm) => sum + pm.amount, 0);
+        
+        this.activeCashRegister.expectedBalance += cashPayment;
+        
+        // Update in database
+        this.cashRegisterService.updateExpectedBalance(
+            this.activeCashRegister.id,
+            this.activeCashRegister.expectedBalance
+        ).subscribe();
+    }
+}
+```
+
+### Reporting
+
+Add summary reports:
+
+```typescript
+getCashRegisterSummary(registerId: string): Observable<CashRegisterSummary> {
+    return this.cashRegisterService.getSummary(registerId).pipe(
+        map(res => ({
+            totalSales: res.data.totalSales,
+            cashSales: res.data.cashSales,
+            cardSales: res.data.cardSales,
+            transactionCount: res.data.transactionCount,
+            averageTransaction: res.data.averageTransaction,
+            largestSale: res.data.largestSale
+        }))
+    );
+}
+```
+
+## UI Components
+
+The component uses PrimeNG components:
+
+- **Dialog**: For opening and closing modals
+- **Button**: Action buttons
+- **Card**: Display register information
+- **InputText**: Number inputs for balances
+- **Badge**: Status indicators
+- **Divider**: Visual separation
+
+```typescript
+imports: [
+    CommonModule,
+    FormsModule,
+    ButtonModule,
+    CardModule,
+    InputTextModule,
+    DialogModule,
+    BadgeModule,
+    DividerModule
+]
+```
+**Source**: `cash-register.component.ts:14-22`
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Cannot open new register">
+    Ensure the current register is closed first. Only one register can be open at a time in the current implementation.
+  </Accordion>
+  
+  <Accordion title="Large variance detected">
+    1. Recount the cash drawer
+    2. Review the day's transactions for voids or refunds
+    3. Check for unrecorded sales
+    4. Verify card terminal batch totals match system records
+  </Accordion>
+  
+  <Accordion title="Opening balance not saved">
+    Check that the opening balance is greater than zero. The validation prevents opening with zero or negative amounts.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="POS System" icon="cash-register" href="/features/pos-system">
+    Process sales that update cash register balances
+  </Card>
+  <Card title="Reports" icon="chart-line" href="/features/reports">
+    View detailed sales reports by cash register
+  </Card>
+  <Card title="Invoicing" icon="file-invoice" href="/features/invoicing">
+    Review invoices associated with a cash register shift
+  </Card>
+  <Card title="Permissions" icon="shield" href="/admin/permissions">
+    Manage user roles and permissions
+  </Card>
+</CardGroup>

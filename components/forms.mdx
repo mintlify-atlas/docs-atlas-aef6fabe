@@ -1,0 +1,602 @@
+---
+title: 'Form Components & Validation'
+description: 'Documentation for form patterns, validation, and PrimeNG form components used throughout the application'
+---
+
+## Form Architecture
+
+The application uses **Template-Driven Forms** with Angular's `FormsModule` and PrimeNG form components.
+
+## Common Form Pattern
+
+Most CRUD pages follow this structure:
+
+```typescript
+// src/app/components/pages/master/customers/customers.component.ts:26-33
+@Component({
+    selector: 'app-customers',
+    standalone: true,
+    imports: [
+        CommonModule, FormsModule, 
+        TableModule, DialogModule, DropdownModule, InputTextModule, 
+        InputSwitchModule, ButtonModule, ToastModule, ToggleSwitchModule
+    ],
+    templateUrl: './customers.component.html',
+    providers: [MessageService]
+})
+export class CustomersComponent implements OnInit { ... }
+```
+
+## PrimeNG Form Components
+
+### Input Text
+
+```html
+<div class="field">
+    <label for="firstName" class="block text-sm font-bold mb-2">
+        Primer Nombre *
+    </label>
+    <input 
+        pInputText 
+        id="firstName" 
+        [(ngModel)]="currentCustomer.firstName" 
+        class="w-full" 
+        placeholder="Ingrese el nombre"
+        required
+    />
+</div>
+```
+
+### Input Number
+
+```html
+<div class="field">
+    <label for="price" class="block text-sm font-bold mb-2">
+        Precio
+    </label>
+    <p-inputNumber 
+        [(ngModel)]="newProduct.price" 
+        mode="currency" 
+        currency="COP" 
+        locale="es-CO"
+        [minFractionDigits]="0"
+        [maxFractionDigits]="0"
+        class="w-full"
+    ></p-inputNumber>
+</div>
+```
+
+<Tip>
+The app uses Colombian locale (es-CO) for currency formatting with COP (Colombian Peso).
+</Tip>
+
+### Dropdown
+
+```html
+<div class="field">
+    <label for="category" class="block text-sm font-bold mb-2">
+        Categoría *
+    </label>
+    <p-dropdown 
+        [(ngModel)]="newProduct.categoryId" 
+        [options]="categories" 
+        optionLabel="name" 
+        optionValue="id"
+        placeholder="Seleccione una categoría"
+        class="w-full"
+        [showClear]="true"
+    ></p-dropdown>
+</div>
+```
+
+### Toggle Switch
+
+```html
+<div class="field flex items-center gap-3">
+    <p-toggleSwitch 
+        [(ngModel)]="newProduct.active" 
+        inputId="active"
+    ></p-toggleSwitch>
+    <label for="active" class="font-bold">
+        Producto Activo
+    </label>
+</div>
+```
+
+### Input Switch (Boolean)
+
+```html
+<div class="field flex items-center gap-3">
+    <p-inputSwitch 
+        [(ngModel)]="currentCustomer.isCompany" 
+        inputId="isCompany"
+    ></p-inputSwitch>
+    <label for="isCompany" class="font-bold">
+        ¿Es empresa?
+    </label>
+</div>
+```
+
+## Dialog-Based Forms
+
+Most forms are displayed in PrimeNG dialogs:
+
+### Customer Form Example
+
+```typescript
+// src/app/components/pages/master/customers/customers.component.ts:43-53
+showDialog = false;
+isEditing = false;
+currentCustomer: Customer = this.getEmptyCustomer();
+
+openAddDialog() {
+    this.currentCustomer = this.getEmptyCustomer();
+    this.isEditing = false;
+    this.showDialog = true;
+}
+
+editCustomer(customer: Customer) {
+    this.currentCustomer = { ...customer };
+    this.isEditing = true;
+    this.showDialog = true;
+}
+
+closeDialog() {
+    this.showDialog = false;
+}
+```
+
+### Dialog Template
+
+```html
+<p-dialog 
+    [(visible)]="showDialog" 
+    [modal]="true" 
+    [style]="{ width: '50vw' }"
+    [breakpoints]="{ '960px': '75vw', '640px': '95vw' }"
+    [header]="isEditing ? 'Editar Cliente' : 'Nuevo Cliente'"
+    [closable]="true"
+    [draggable]="false"
+    styleClass="p-fluid"
+>
+    <ng-template pTemplate="content">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Form fields here -->
+            <div class="field">
+                <label for="firstName">Primer Nombre *</label>
+                <input pInputText id="firstName" 
+                       [(ngModel)]="currentCustomer.firstName" />
+            </div>
+            
+            <div class="field">
+                <label for="lastName">Primer Apellido *</label>
+                <input pInputText id="lastName" 
+                       [(ngModel)]="currentCustomer.lastName" />
+            </div>
+            
+            <!-- More fields... -->
+        </div>
+    </ng-template>
+    
+    <ng-template pTemplate="footer">
+        <div class="flex justify-end gap-2">
+            <p-button 
+                label="Cancelar" 
+                icon="pi pi-times" 
+                (onClick)="closeDialog()" 
+                severity="secondary"
+            ></p-button>
+            <p-button 
+                label="Guardar" 
+                icon="pi pi-check" 
+                (onClick)="saveCustomer()" 
+                severity="primary"
+            ></p-button>
+        </div>
+    </ng-template>
+</p-dialog>
+```
+
+<Note>
+Dialogs are responsive with breakpoints for mobile, tablet, and desktop views.
+</Note>
+
+## Form Validation
+
+### Basic Validation
+
+```typescript
+// src/app/components/pages/master/customers/customers.component.ts:212-220
+saveCustomer() {
+    if (!this.currentCustomer.firstName || 
+        !this.currentCustomer.document || 
+        !this.currentCustomer.email) {
+        this.messageService.add({
+            severity: 'warn',
+            summary: 'Campos requeridos',
+            detail: 'Debe completar los campos obligatorios.'
+        });
+        return;
+    }
+    
+    const operation = this.masterService.CreateClient(this.currentCustomer);
+    
+    operation.subscribe({
+        next: (res) => {
+            if (res.code === 0) {
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Éxito',
+                    detail: res.message || 'Operación realizada correctamente.'
+                });
+                this.showDialog = false;
+                this.loadCustomers();
+            }
+        },
+        error: () => this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'Error al guardar el cliente.'
+        })
+    });
+}
+```
+
+### Toast Notifications
+
+The app uses PrimeNG's `MessageService` for user feedback:
+
+```typescript
+// Required import
+import { MessageService } from 'primeng/api';
+import { ToastModule } from 'primeng/toast';
+
+// Component decorator
+@Component({
+    // ...
+    providers: [MessageService]
+})
+
+// Usage in component
+this.messageService.add({
+    severity: 'success', // success | info | warn | error
+    summary: 'Success',
+    detail: 'Record saved successfully',
+    life: 3000 // Duration in ms
+});
+```
+
+Add the toast component to your template:
+
+```html
+<p-toast></p-toast>
+```
+
+## Advanced Form Patterns
+
+### Inventory Product Form
+
+The inventory form demonstrates a complex multi-warehouse pattern:
+
+```typescript
+// src/app/components/pages/inventory/inventory.component.ts:27-29
+interface WarehouseUI extends ProductWarehouseRequest {
+    name: string; // Display name in modal
+}
+
+warehousesUI: WarehouseUI[] = [];
+```
+
+### Warehouse UI Preparation
+
+```typescript
+// src/app/components/pages/inventory/inventory.component.ts:280-296
+prepareWarehouseUI(product?: Product) {
+    this.warehousesUI = this.masterWarehouses.map((wh) => {
+        const stockRecord = product?.existencias?.find(
+            (e) => e.wareHouseId === wh.id
+        );
+        
+        const limitRecord = product?.maximosMinimos?.find(
+            (m) => m.wareHouseId === wh.id
+        );
+        
+        return {
+            warehouseId: wh.id!,
+            name: wh.name,
+            stock: stockRecord?.stock ?? 0,
+            minStock: limitRecord?.minStock ?? 0,
+            maxStock: limitRecord?.maxStock ?? 0
+        };
+    });
+}
+
+openAddDialog() {
+    this.newProduct = { active: true, manageStock: true, price: 0 };
+    this.prepareWarehouseUI(); // Initialize with empty data
+    this.showAddDialog = true;
+}
+
+editProduct(product: Product) {
+    this.newProduct = { ...product };
+    this.prepareWarehouseUI(product); // Load existing data
+    this.showEditDialog = true;
+}
+```
+
+### Warehouse Form Template
+
+```html
+<div class="field">
+    <label class="block text-sm font-bold mb-2">
+        Stock por Bodega
+    </label>
+    
+    <div class="space-y-2">
+        @for (wh of warehousesUI; track wh.warehouseId) {
+            <div class="p-4 border rounded-lg">
+                <h4 class="font-bold mb-3">{{ wh.name }}</h4>
+                
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="text-xs">Stock Actual</label>
+                        <p-inputNumber 
+                            [(ngModel)]="wh.stock" 
+                            [min]="0" 
+                            class="w-full"
+                        ></p-inputNumber>
+                    </div>
+                    
+                    <div>
+                        <label class="text-xs">Stock Mínimo</label>
+                        <p-inputNumber 
+                            [(ngModel)]="wh.minStock" 
+                            [min]="0" 
+                            class="w-full"
+                        ></p-inputNumber>
+                    </div>
+                    
+                    <div>
+                        <label class="text-xs">Stock Máximo</label>
+                        <p-inputNumber 
+                            [(ngModel)]="wh.maxStock" 
+                            [min]="0" 
+                            class="w-full"
+                        ></p-inputNumber>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+```
+
+### Save with Nested Data
+
+```typescript
+// src/app/components/pages/inventory/inventory.component.ts:325-359
+saveProduct() {
+    const request: ProductCreateRequest = {
+        id: this.newProduct.id,
+        userId: this.userId,
+        companiaId: this.companiaId,
+        name: this.newProduct.name,
+        description: this.newProduct.description || '',
+        barcode: this.newProduct.barcode,
+        reference: this.newProduct.reference,
+        extension1: this.newProduct.extension1,
+        extension2: this.newProduct.extension2,
+        price: this.newProduct.price,
+        imageUrl: this.newProduct.imageUrl,
+        categoryId: this.newProduct.categoryId,
+        unitMeasureId: this.newProduct.unitMeasureId,
+        active: this.newProduct.active,
+        manageStock: this.newProduct.manageStock,
+        warehouses: this.warehousesUI.map((w) => ({
+            warehouseId: w.warehouseId,
+            stock: w.stock,
+            minStock: w.minStock,
+            maxStock: w.maxStock
+        }))
+    };
+    
+    const action = this.inventoryService.createProduct(request);
+    
+    action.subscribe({
+        next: () => {
+            this.messageService.add({ 
+                severity: 'success', 
+                summary: 'Éxito', 
+                detail: 'Producto guardado' 
+            });
+            this.closeDialog();
+            this.loadInventory();
+        }
+    });
+}
+```
+
+## Image Upload
+
+### File Input with Preview
+
+```typescript
+// src/app/components/pages/inventory/inventory.component.ts:316-323
+onImageSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e: any) => {
+            this.newProduct.imageUrl = e.target.result; // Base64
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+getImageUrl(): string | null {
+    if (!this.newProduct.imageUrl) return null;
+    
+    // Detect base64
+    const isBase64 = this.newProduct.imageUrl.startsWith('data:');
+    
+    if (isBase64) {
+        return this.newProduct.imageUrl;
+    }
+    
+    // Build Digital Ocean URL
+    return this.digitalOcean.url + '/' + this.newProduct.imageUrl;
+}
+```
+
+### Template
+
+```html
+<div class="field">
+    <label class="block text-sm font-bold mb-2">Imagen del Producto</label>
+    
+    <div class="flex items-center gap-4">
+        <input 
+            type="file" 
+            (change)="onImageSelected($event)" 
+            accept="image/*"
+            class="hidden"
+            #fileInput
+        />
+        
+        <button 
+            type="button"
+            pButton 
+            label="Seleccionar Imagen" 
+            icon="pi pi-upload" 
+            (click)="fileInput.click()"
+            class="p-button-outlined"
+        ></button>
+        
+        <div *ngIf="getImageUrl()" 
+             class="w-20 h-20 border rounded overflow-hidden">
+            <img [src]="getImageUrl()" 
+                 alt="Preview" 
+                 class="w-full h-full object-cover" />
+        </div>
+    </div>
+</div>
+```
+
+## Form State Management
+
+### Empty Model Factory
+
+```typescript
+// src/app/components/pages/master/customers/customers.component.ts:258-281
+private getEmptyCustomer(): Customer {
+    return {
+        id: 0,
+        companiaId: this.companiaId,
+        userId: this.userId,
+        identificationTypeId: 1,
+        document: '',
+        firstName: '',
+        middleName: '',
+        lastName: '',
+        secondLastName: '',
+        phone: '',
+        email: '',
+        city: '',
+        department: '',
+        country: '',
+        address: '',
+        isCompany: false,
+        nit: '',
+        businessName: '',
+        createdAt: new Date(),
+        updatedAt: new Date()
+    };
+}
+```
+
+<Tip>
+Using factory methods ensures forms always start with valid default values.
+</Tip>
+
+## Permission-Based Form Actions
+
+```typescript
+// Component properties
+canCreate = false;
+canEdit = false;
+canDelete = false;
+
+private applyPermissions(): void {
+    const moduleName = 'Inventario';
+    const permission = this.permissions.find((p) => p.module === moduleName);
+    
+    if (!permission) {
+        this.resetPermissions();
+        return;
+    }
+    
+    this.canCreate = permission.canCreate;
+    this.canEdit = permission.canEdit;
+    this.canDelete = permission.canDelete;
+}
+```
+
+### Conditional Rendering
+
+```html
+<!-- Only show create button if user has permission -->
+<button 
+    *ngIf="canCreate"
+    pButton 
+    label="Nuevo Cliente" 
+    icon="pi pi-plus" 
+    (click)="openAddDialog()"
+></button>
+
+<!-- Table actions based on permissions -->
+<td>
+    <button 
+        *ngIf="canEdit"
+        pButton 
+        icon="pi pi-pencil" 
+        class="p-button-rounded p-button-text"
+        (click)="editCustomer(customer)"
+    ></button>
+    
+    <button 
+        *ngIf="canDelete"
+        pButton 
+        icon="pi pi-trash" 
+        class="p-button-rounded p-button-text p-button-danger"
+        (click)="deleteCustomer(customer)"
+    ></button>
+</td>
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Two-Way Binding" icon="arrow-right-arrow-left">
+    Use `[(ngModel)]` for simple forms with template-driven approach
+  </Card>
+  <Card title="Validation" icon="shield-check">
+    Validate on save and show clear error messages via toast
+  </Card>
+  <Card title="Loading States" icon="spinner">
+    Disable form buttons during API calls to prevent double-submission
+  </Card>
+  <Card title="Factory Methods" icon="industry">
+    Use factory methods for consistent empty/default models
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Table Components" icon="table" href="/components/tables">
+    Learn about data tables and grids
+  </Card>
+  <Card title="Services" icon="code" href="/components/services">
+    Explore service layer patterns
+  </Card>
+</CardGroup>

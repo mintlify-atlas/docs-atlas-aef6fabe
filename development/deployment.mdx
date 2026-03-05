@@ -1,0 +1,662 @@
+---
+title: Build & Deployment
+description: Production build process and deployment configuration for Vercel and other platforms
+---
+
+## Overview
+
+The application is optimized for deployment with:
+
+- **Production Builds** - Optimized Angular builds
+- **Vercel Configuration** - SPA routing support
+- **Build Budgets** - Size monitoring
+- **Environment Configuration** - Multi-environment support
+
+## Build Process
+
+### Development Build
+
+Build for development with source maps and debugging:
+
+```bash
+npm run watch
+```
+
+This runs:
+```bash
+ng build --watch --configuration development
+```
+
+**Build Configuration**:
+- **Optimization**: Disabled
+- **Source Maps**: Enabled
+- **License Extraction**: Disabled
+- **Output**: `dist/sakai-ng/`
+
+### Production Build
+
+Create an optimized production build:
+
+```bash
+npm run build
+```
+
+This runs:
+```bash
+ng build
+```
+
+**Build Configuration** (`angular.json`):
+
+```json
+{
+    "configurations": {
+        "production": {
+            "budgets": [
+                {
+                    "type": "initial",
+                    "maximumWarning": "1mb",
+                    "maximumError": "5mb"
+                },
+                {
+                    "type": "anyComponentStyle",
+                    "maximumWarning": "2kb",
+                    "maximumError": "4kb"
+                }
+            ],
+            "outputHashing": "all"
+        }
+    },
+    "defaultConfiguration": "production"
+}
+```
+
+**File Location**: `angular.json:36-58`
+
+### Build Output
+
+Production builds output to:
+
+```
+dist/sakai-ng/
+├── browser/
+│   ├── index.html
+│   ├── main-[hash].js
+│   ├── polyfills-[hash].js
+│   ├── styles-[hash].css
+│   └── assets/
+└── server/              # SSR files (if configured)
+```
+
+**Output Path**: `dist/sakai-ng` (configured in `angular.json:20`)
+
+## Build Optimizations
+
+### Production Features
+
+<Steps>
+  <Step title="Code Minification">
+    JavaScript and CSS are minified to reduce file size.
+  </Step>
+
+  <Step title="Tree Shaking">
+    Unused code is automatically removed from the bundle.
+  </Step>
+
+  <Step title="Lazy Loading">
+    Routes are lazy-loaded for optimal performance:
+    
+    ```typescript
+    { 
+        path: 'pages', 
+        loadChildren: () => import('./app/components/pages/pages.routes') 
+    }
+    ```
+  </Step>
+
+  <Step title="Output Hashing">
+    All files include content hashes for cache busting:
+    
+    ```
+    main-K7J3H8D9.js
+    styles-M2N4P6Q8.css
+    ```
+  </Step>
+
+  <Step title="Bundle Budgets">
+    Build fails if bundles exceed size limits:
+    - Initial bundle: 5MB maximum
+    - Component styles: 4KB maximum
+  </Step>
+</Steps>
+
+### Bundle Analysis
+
+Analyze bundle size:
+
+```bash
+ng build --stats-json
+npx webpack-bundle-analyzer dist/sakai-ng/browser/stats.json
+```
+
+## Deployment Configuration
+
+### Vercel Deployment
+
+The application is configured for Vercel deployment.
+
+**Configuration File**: `vercel.json`
+
+<CodeGroup>
+```json vercel.json
+{
+    "rewrites": [
+        {
+            "source": "/:path*",
+            "destination": "/index.html"
+        }
+    ],
+    "trailingSlash": false
+}
+```
+</CodeGroup>
+
+**File Location**: `vercel.json`
+
+### Rewrite Rules Explained
+
+- **Source**: `/:path*` - Matches all routes
+- **Destination**: `/index.html` - Serves the Angular SPA
+- **Purpose**: Enables client-side routing for SPA
+
+This ensures that:
+1. All routes are handled by Angular Router
+2. Direct URL access works (e.g., `/pages/customers`)
+3. Page refreshes don't result in 404 errors
+
+### Deploy to Vercel
+
+<Steps>
+  <Step title="Install Vercel CLI">
+    ```bash
+    npm install -g vercel
+    ```
+  </Step>
+
+  <Step title="Login to Vercel">
+    ```bash
+    vercel login
+    ```
+  </Step>
+
+  <Step title="Deploy">
+    ```bash
+    # Build first
+    npm run build
+    
+    # Deploy
+    vercel --prod
+    ```
+  </Step>
+
+  <Step title="Configure Settings">
+    Set the output directory to `dist/sakai-ng/browser` in Vercel dashboard.
+  </Step>
+</Steps>
+
+### Vercel Project Settings
+
+**Build Settings**:
+- **Framework Preset**: Angular
+- **Build Command**: `npm run build`
+- **Output Directory**: `dist/sakai-ng/browser`
+- **Install Command**: `npm install`
+
+**Environment Variables**:
+Set in Vercel dashboard under Settings → Environment Variables.
+
+## Other Deployment Platforms
+
+### Netlify
+
+Create `netlify.toml`:
+
+```toml
+[build]
+  command = "npm run build"
+  publish = "dist/sakai-ng/browser"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+```
+
+### AWS S3 + CloudFront
+
+<Steps>
+  <Step title="Build Application">
+    ```bash
+    npm run build
+    ```
+  </Step>
+
+  <Step title="Upload to S3">
+    ```bash
+    aws s3 sync dist/sakai-ng/browser/ s3://your-bucket-name/
+    ```
+  </Step>
+
+  <Step title="Configure CloudFront">
+    Create a CloudFront distribution with custom error response:
+    - Error Code: 403
+    - Response Page Path: `/index.html`
+    - HTTP Response Code: 200
+  </Step>
+</Steps>
+
+### Docker Deployment
+
+Create `Dockerfile`:
+
+```dockerfile
+# Build stage
+FROM node:18-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Serve stage
+FROM nginx:alpine
+COPY --from=build /app/dist/sakai-ng/browser /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+Create `nginx.conf`:
+
+```nginx
+server {
+    listen 80;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Cache static assets
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
+```
+
+Build and run:
+
+```bash
+docker build -t pos-frontend .
+docker run -p 8080:80 pos-frontend
+```
+
+### GitHub Pages
+
+<Warning>
+GitHub Pages requires special configuration for SPA routing. Use a 404 redirect trick or a custom domain.
+</Warning>
+
+Build with base href:
+
+```bash
+ng build --base-href=/repository-name/
+```
+
+Deploy:
+
+```bash
+npx angular-cli-ghpages --dir=dist/sakai-ng/browser
+```
+
+## Environment Configuration
+
+### Environment Files
+
+Create environment-specific configurations:
+
+```
+src/environments/
+├── environment.ts           # Development
+├── environment.staging.ts     # Staging
+└── environment.prod.ts        # Production
+```
+
+**Development** (`environment.ts`):
+
+```typescript
+export const environment = {
+    production: false,
+    apiUrl: 'http://localhost:3000/api',
+    enableDebugTools: true,
+    logLevel: 'debug'
+};
+```
+
+**Production** (`environment.prod.ts`):
+
+```typescript
+export const environment = {
+    production: true,
+    apiUrl: 'https://api.production.com',
+    enableDebugTools: false,
+    logLevel: 'error'
+};
+```
+
+### Using Environment Variables
+
+```typescript
+import { environment } from '../environments/environment';
+
+@Injectable({
+    providedIn: 'root'
+})
+export class ApiService {
+    private apiUrl = environment.apiUrl;
+
+    constructor(private http: HttpClient) {
+        if (environment.enableDebugTools) {
+            console.log('Debug mode enabled');
+        }
+    }
+}
+```
+
+### Build with Environment
+
+Update `angular.json`:
+
+```json
+{
+    "configurations": {
+        "production": {
+            "fileReplacements": [
+                {
+                    "replace": "src/environments/environment.ts",
+                    "with": "src/environments/environment.prod.ts"
+                }
+            ]
+        },
+        "staging": {
+            "fileReplacements": [
+                {
+                    "replace": "src/environments/environment.ts",
+                    "with": "src/environments/environment.staging.ts"
+                }
+            ]
+        }
+    }
+}
+```
+
+Build for specific environment:
+
+```bash
+ng build --configuration=staging
+```
+
+## Build Budgets
+
+### Understanding Budgets
+
+Build budgets prevent bundle size bloat:
+
+```json
+{
+    "budgets": [
+        {
+            "type": "initial",
+            "maximumWarning": "1mb",
+            "maximumError": "5mb"
+        },
+        {
+            "type": "anyComponentStyle",
+            "maximumWarning": "2kb",
+            "maximumError": "4kb"
+        }
+    ]
+}
+```
+
+**Budget Types**:
+- `initial` - Initial bundle size
+- `anyComponentStyle` - Any component stylesheet
+- `all` - Total of all bundles
+- `any` - Size of any one bundle
+
+### Handling Budget Warnings
+
+If build exceeds budget:
+
+<Steps>
+  <Step title="Analyze Bundle">
+    ```bash
+    ng build --stats-json
+    npx webpack-bundle-analyzer dist/sakai-ng/browser/stats.json
+    ```
+  </Step>
+
+  <Step title="Optimize Imports">
+    Import only what you need:
+    
+    ```typescript
+    // Bad - imports entire library
+    import * as _ from 'lodash';
+    
+    // Good - imports specific function
+    import { map } from 'lodash-es';
+    ```
+  </Step>
+
+  <Step title="Lazy Load Routes">
+    Ensure all routes use lazy loading:
+    
+    ```typescript
+    { 
+        path: 'feature', 
+        loadChildren: () => import('./feature/feature.routes') 
+    }
+    ```
+  </Step>
+
+  <Step title="Split Large Components">
+    Break down large components into smaller, lazy-loaded modules.
+  </Step>
+</Steps>
+
+## Performance Optimization
+
+### Pre-rendering (SSR)
+
+Add Angular Universal for server-side rendering:
+
+```bash
+ng add @angular/ssr
+```
+
+Build with SSR:
+
+```bash
+npm run build:ssr
+npm run serve:ssr
+```
+
+### Service Worker (PWA)
+
+Add Progressive Web App support:
+
+```bash
+ng add @angular/pwa
+```
+
+This adds:
+- Service worker for offline support
+- Web app manifest
+- App icons
+
+### Asset Optimization
+
+**Images**:
+```bash
+# Optimize images before adding to assets
+npx imagemin src/assets/**/*.{jpg,png} --out-dir=src/assets/optimized
+```
+
+**Fonts**:
+```scss
+// Preload fonts in styles.scss
+@font-face {
+    font-family: 'CustomFont';
+    src: url('/assets/fonts/custom.woff2') format('woff2');
+    font-display: swap;
+}
+```
+
+## CI/CD Pipeline
+
+### GitHub Actions
+
+Create `.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests
+        run: npm test -- --watch=false --browsers=ChromeHeadless
+      
+      - name: Build application
+        run: npm run build
+      
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: ./
+```
+
+## Pre-deployment Checklist
+
+<Steps>
+  <Step title="Code Quality">
+    - [ ] All tests pass
+    - [ ] No ESLint errors
+    - [ ] Code formatted with Prettier
+    - [ ] No console.log statements
+  </Step>
+
+  <Step title="Build Verification">
+    - [ ] Production build succeeds
+    - [ ] No bundle budget warnings
+    - [ ] All assets load correctly
+    - [ ] Source maps disabled for production
+  </Step>
+
+  <Step title="Configuration">
+    - [ ] Environment variables set
+    - [ ] API URLs updated
+    - [ ] Authentication configured
+    - [ ] Error tracking enabled
+  </Step>
+
+  <Step title="Testing">
+    - [ ] Test production build locally
+    - [ ] Check all routes work
+    - [ ] Verify authentication flow
+    - [ ] Test on multiple browsers
+  </Step>
+
+  <Step title="Deployment">
+    - [ ] Domain configured
+    - [ ] SSL certificate active
+    - [ ] CDN configured
+    - [ ] Monitoring enabled
+  </Step>
+</Steps>
+
+## Post-deployment
+
+### Monitoring
+
+Set up monitoring tools:
+
+- **Error Tracking**: Sentry, Rollbar
+- **Analytics**: Google Analytics, Plausible
+- **Performance**: Lighthouse CI, Web Vitals
+- **Uptime**: UptimeRobot, Pingdom
+
+### Rollback Strategy
+
+Vercel automatic rollback:
+
+```bash
+# List deployments
+vercel ls
+
+# Promote previous deployment
+vercel promote <deployment-url>
+```
+
+## Best Practices
+
+<Tip>
+**Deployment Tips**
+- Always test production builds locally first
+- Use environment variables for configuration
+- Enable caching for static assets
+- Implement proper error tracking
+- Monitor bundle sizes regularly
+- Set up automated deployments
+</Tip>
+
+<Warning>
+**Common Deployment Issues**
+- 404 errors on route refresh (missing SPA rewrite rules)
+- CORS errors (incorrect API URL configuration)
+- Missing environment variables
+- Large bundle sizes (exceeding budgets)
+- Broken asset paths (incorrect base href)
+</Warning>
+
+## Next Steps
+
+- Review [Development Setup](/development/setup)
+- Learn about [Application Architecture](/development/architecture)
+- Understand [Testing Guide](/development/testing)

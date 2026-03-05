@@ -1,0 +1,457 @@
+---
+title: 'Permissions & Users'
+description: 'Manage roles, permissions, and user access control with granular module-level permissions'
+icon: 'shield-halved'
+---
+
+## Overview
+
+The Permissions module provides comprehensive role-based access control (RBAC) for your POS system. Administrators can create roles, assign granular permissions across modules, and manage users with specific role assignments.
+
+<Note>
+  This module requires the **Permisos** permission with `canView` enabled. Editing roles and users requires `canCreate` and `canEdit` permissions.
+</Note>
+
+## Component Location
+
+```
+~/workspace/source/src/app/components/pages/master/permissions/permissions.component.ts
+```
+
+## Data Models
+
+### Permission Interface
+
+<ParamField path="moduleId" type="number" required>
+  Unique identifier for the module (e.g., 1 = Sales, 2 = Inventory)
+</ParamField>
+
+<ParamField path="module" type="string" required>
+  Display name of the module (e.g., "Ventas", "Inventario", "Configuración")
+</ParamField>
+
+<ParamField path="canView" type="boolean" required>
+  Allows viewing data in this module. When disabled, all other permissions are automatically revoked.
+</ParamField>
+
+<ParamField path="canCreate" type="boolean" required>
+  Allows creating new records in this module
+</ParamField>
+
+<ParamField path="canEdit" type="boolean" required>
+  Allows editing existing records in this module
+</ParamField>
+
+<ParamField path="canDelete" type="boolean" required>
+  Allows deleting records in this module
+</ParamField>
+
+<ParamField path="canExport" type="boolean" required>
+  Allows exporting data from this module to Excel/CSV
+</ParamField>
+
+### Role Interface
+
+<ParamField path="id" type="number" required>
+  Unique role identifier (0 for new roles)
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Role name (e.g., "Administrator", "Cashier", "Manager")
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Detailed description of the role's purpose and responsibilities
+</ParamField>
+
+<ParamField path="permissions" type="Permission[]" required>
+  Array of module permissions assigned to this role
+</ParamField>
+
+<ParamField path="isActive" type="boolean" required>
+  Whether the role is currently active (default: true)
+</ParamField>
+
+<ParamField path="userCount" type="number">
+  Number of users currently assigned to this role (calculated)
+</ParamField>
+
+<ParamField path="createdAt" type="string">
+  ISO timestamp of role creation
+</ParamField>
+
+### User Interface
+
+<ParamField path="id" type="number" required>
+  Unique user identifier (0 for new users)
+</ParamField>
+
+<ParamField path="companiaId" type="number" required>
+  Company/tenant ID this user belongs to
+</ParamField>
+
+<ParamField path="rolId" type="number" required>
+  Role ID assigned to this user
+</ParamField>
+
+<ParamField path="rol" type="string">
+  Role name (for display purposes)
+</ParamField>
+
+<ParamField path="firstName" type="string" required>
+  User's first name
+</ParamField>
+
+<ParamField path="middleName" type="string">
+  User's middle name (optional)
+</ParamField>
+
+<ParamField path="lastName" type="string" required>
+  User's last name
+</ParamField>
+
+<ParamField path="secondLastName" type="string">
+  User's second last name (optional)
+</ParamField>
+
+<ParamField path="email" type="string" required>
+  User's email address (used for login)
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  User's password (hashed on server)
+</ParamField>
+
+<ParamField path="session" type="boolean">
+  Whether the user is currently logged in
+</ParamField>
+
+<ParamField path="status" type="boolean" required>
+  Whether the user account is active (default: true)
+</ParamField>
+
+### Module Interface
+
+<ParamField path="id" type="number" required>
+  Unique module identifier
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Module display name
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Module description
+</ParamField>
+
+## Role Management Workflow
+
+<Steps>
+  <Step title="Access Permissions Module">
+    Navigate to **Master > Permissions** from the main menu. The page displays two tabs: **Roles** and **Users**.
+  </Step>
+
+  <Step title="Create a New Role">
+    Click the **New Role** button. A dialog opens with:
+    - **Name**: Enter a descriptive role name (required)
+    - **Description**: Explain the role's purpose (required)
+    - **Active**: Toggle to activate/deactivate the role
+    
+    <Warning>
+      Role names should be unique and descriptive (e.g., "Store Manager" instead of "Role1").
+    </Warning>
+  </Step>
+
+  <Step title="Configure Module Permissions">
+    For each module in the system, set granular permissions:
+    
+    | Permission | Description | Auto-Behavior |
+    |-----------|-------------|---------------|
+    | **View** | See module data | When disabled, all other permissions are revoked |
+    | **Create** | Add new records | Requires View enabled |
+    | **Edit** | Modify existing records | Requires View enabled |
+    | **Delete** | Remove records | Requires View enabled |
+    | **Export** | Export data to files | Requires View enabled |
+    
+    <Info>
+      The system automatically disables Create, Edit, Delete, and Export when View is unchecked.
+    </Info>
+  </Step>
+
+  <Step title="Save the Role">
+    Click **Save**. The system:
+    1. Validates that Name and Description are filled
+    2. Creates the role record
+    3. Saves all module permissions
+    4. Displays success confirmation
+    
+    The role now appears in the roles list.
+  </Step>
+
+  <Step title="Edit Existing Role">
+    Click the **Edit** icon on any role to modify:
+    - Role name and description
+    - Active status
+    - Module permissions
+    
+    <Note>
+      Changes to role permissions affect all users assigned to that role immediately.
+    </Note>
+  </Step>
+
+  <Step title="Delete a Role">
+    Click the **Delete** icon and confirm. 
+    
+    <Warning>
+      Users assigned to deleted roles will lose their permissions. Reassign users before deleting.
+    </Warning>
+  </Step>
+</Steps>
+
+## User Management Workflow
+
+<Steps>
+  <Step title="Switch to Users Tab">
+    Click the **Users** tab to view all system users. The table displays:
+    - Full name
+    - Email
+    - Assigned role
+    - Active status
+    - Session status (currently logged in)
+  </Step>
+
+  <Step title="Create a New User">
+    Click **New User** and fill in the form:
+    - **First Name**: Required
+    - **Middle Name**: Optional
+    - **Last Name**: Required
+    - **Second Last Name**: Optional
+    - **Email**: Required (must be unique)
+    - **Password**: Required (minimum 8 characters recommended)
+    - **Role**: Select from active roles dropdown
+    - **Status**: Active/Inactive toggle
+  </Step>
+
+  <Step title="Save User">
+    Click **Save**. The system creates the user account with the assigned role's permissions.
+    
+    <Info>
+      Users can log in immediately after creation using their email and password.
+    </Info>
+  </Step>
+
+  <Step title="Edit User Details">
+    Click **Edit** on any user to update:
+    - Personal information
+    - Email address
+    - Assigned role
+    - Active status
+    
+    <Note>
+      Changing a user's role immediately updates their permissions across all modules.
+    </Note>
+  </Step>
+
+  <Step title="Deactivate/Delete User">
+    - **Deactivate**: Set Status to Inactive (preserves data)
+    - **Delete**: Removes user from the system
+    
+    <Warning>
+      Deleted users cannot be recovered. Consider deactivating instead.
+    </Warning>
+  </Step>
+</Steps>
+
+## Permission Cascading Logic
+
+The system implements smart permission cascading:
+
+```typescript
+updateRolePermission(moduleId: number, key: keyof Permission, value: boolean) {
+  this.currentRole.permissions = this.currentRole.permissions.map((p) => {
+    if (p.moduleId === moduleId) {
+      const updated = { ...p, [key]: value };
+      
+      // When View is disabled, revoke all other permissions
+      if (key === 'canView' && !value) {
+        updated.canCreate = false;
+        updated.canEdit = false;
+        updated.canDelete = false;
+        updated.canExport = false;
+      }
+      return updated;
+    }
+    return p;
+  });
+}
+```
+
+<Info>
+  This ensures users cannot have Create, Edit, Delete, or Export permissions without View access.
+</Info>
+
+## Role Filtering and Search
+
+The component provides built-in search functionality:
+
+```typescript
+get filteredRoles(): Role[] {
+  return this.roles.filter((r) => 
+    r.name.toLowerCase().includes(this.searchTerm.toLowerCase()) || 
+    r.description.toLowerCase().includes(this.searchTerm.toLowerCase())
+  );
+}
+```
+
+Use the search bar to filter roles by name or description.
+
+## Default Role Behavior
+
+The system excludes the "Sin Rol" (No Role) from the UI:
+
+```typescript
+this.roles = this.roles.filter((r) => 
+  r.name.toLowerCase() !== 'sin rol'
+);
+```
+
+This is a system-reserved role for users without explicit role assignments.
+
+## Permission Check Example
+
+Components check permissions before rendering UI elements:
+
+```typescript
+ngOnInit(): void {
+  const session = this.authService.getSession() as AuthSession;
+  const { userId, companiaId } = session;
+  
+  this.loginService.getPermissions(userId, companiaId).subscribe({
+    next: (permissions) => {
+      this.permissions = permissions.data ?? [];
+      const permission = this.permissions.find((p) => 
+        p.module === 'Permisos'
+      );
+      
+      this.canView = permission.canView;
+      this.canCreate = permission.canCreate;
+      this.canEdit = permission.canEdit;
+      this.canDelete = permission.canDelete;
+    }
+  });
+}
+```
+
+## API Integration
+
+### Load Roles
+```typescript
+this.masterService.getRoles(companiaId).subscribe({
+  next: (res) => {
+    if (res.code === 0) {
+      this.roles = res.data || [];
+    }
+  }
+});
+```
+
+### Save Role and Permissions
+```typescript
+// 1. Save role metadata
+this.masterService.saveRole({
+  id: this.currentRole.id,
+  companiaId: this.companiaId,
+  name: this.currentRole.name,
+  description: this.currentRole.description,
+  isActive: this.currentRole.isActive
+}).subscribe({
+  next: (res) => {
+    const roleId = res.data;
+    // 2. Save permissions
+    this.saveRolePermissions(roleId);
+  }
+});
+```
+
+### Save Permissions
+```typescript
+const body = this.currentRole.permissions.map((perm) => ({
+  roleId: roleId,
+  moduleId: perm.moduleId,
+  canView: perm.canView,
+  canCreate: perm.canCreate,
+  canEdit: perm.canEdit,
+  canDelete: perm.canDelete,
+  canExport: perm.canExport
+}));
+
+this.masterService.saveRolePermission(body).subscribe(...);
+```
+
+### User Management
+```typescript
+// Create or update user
+this.masterService.createUser(this.currentUser).subscribe({
+  next: (res) => {
+    if (res.code === 0) {
+      this.loadUsers();
+    }
+  }
+});
+
+// Delete user
+this.masterService.deleteUser(user).subscribe(...);
+```
+
+## Security Best Practices
+
+<Warning>
+  **Never grant excessive permissions.** Follow the principle of least privilege—users should only have permissions necessary for their job function.
+</Warning>
+
+<Info>
+  **Regular audits:** Review user permissions quarterly to ensure they align with current responsibilities.
+</Info>
+
+<Note>
+  **Test new roles:** Create a test user with the new role to verify permissions work as expected before assigning to production users.
+</Note>
+
+## UI Components
+
+PrimeNG components used:
+
+- **TabView**: Separate Roles and Users management
+- **Table**: Display roles and users with sorting
+- **Dialog**: Modal forms for creating/editing
+- **InputSwitch**: Toggle permissions and active status
+- **Dropdown**: Select roles for user assignment
+- **Password**: Secure password input
+- **Button**: Action buttons with icons
+- **Toast**: Success/error notifications
+
+## Troubleshooting
+
+### Users Can't Access Modules
+- Verify the user's role has `canView` enabled for that module
+- Check that the user's account status is Active
+- Ensure the role itself is Active
+
+### Permission Changes Not Applied
+- Log out and log back in to refresh session permissions
+- Check that permissions were saved successfully (watch for error toasts)
+- Verify the correct role is assigned to the user
+
+### Can't Delete Role
+- Check if users are still assigned to the role
+- Reassign users to a different role first
+- Ensure you have `canDelete` permission for the Permisos module
+
+## Code Reference
+
+Key implementation files:
+
+- Component: `permissions.component.ts:33-435`
+- Interfaces: `api/permissions.ts:1-46`
+- Permission Logic: `permissions.component.ts:242-257`
+- User Management: `permissions.component.ts:337-407`

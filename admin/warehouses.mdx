@@ -1,0 +1,396 @@
+---
+title: 'Warehouse Management'
+description: 'Manage warehouse locations, inventory distribution, and multi-location stock tracking'
+icon: 'warehouse'
+---
+
+## Overview
+
+The Warehouse Management module enables multi-location inventory tracking. Define warehouse locations, configure stock distribution, and manage inventory across multiple physical sites for accurate stock control.
+
+<Note>
+  This module requires the **Bodegas** permission with `canView` enabled. Creating and editing warehouses requires `canCreate` and `canEdit` permissions.
+</Note>
+
+## Component Location
+
+```
+~/workspace/source/src/app/components/pages/master/warehouses/warehouses.component.ts
+```
+
+## Data Model
+
+### Warehouse Interface
+
+<ParamField path="id" type="number">
+  Unique warehouse identifier (auto-generated)
+</ParamField>
+
+<ParamField path="companiaId" type="number" required>
+  Company ID this warehouse belongs to (multi-tenant support)
+</ParamField>
+
+<ParamField path="warehouseId" type="string" required>
+  Custom warehouse identifier or code
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Warehouse display name (e.g., "Main Warehouse", "Store #1")
+</ParamField>
+
+<ParamField path="code" type="string" required>
+  Short warehouse code for quick identification (e.g., "WH-01", "STR-001")
+</ParamField>
+
+<ParamField path="address" type="string">
+  Physical address of the warehouse location
+</ParamField>
+
+<ParamField path="city" type="string">
+  City where the warehouse is located
+</ParamField>
+
+<ParamField path="phone" type="string">
+  Contact phone number for the warehouse
+</ParamField>
+
+<ParamField path="active" type="boolean">
+  Whether the warehouse is currently active (default: true)
+</ParamField>
+
+<ParamField path="createdAt" type="Date">
+  Timestamp when the warehouse was created
+</ParamField>
+
+## Warehouse Management Workflow
+
+<Steps>
+  <Step title="Access Warehouse Module">
+    Navigate to **Master > Warehouses** from the main menu. You'll see a table listing all warehouses with:
+    - Name
+    - Code
+    - City
+    - Address
+    - Phone
+    - Active status
+  </Step>
+
+  <Step title="Create New Warehouse">
+    Click the **New Warehouse** button to open the creation dialog.
+    
+    **Required Fields:**
+    - **Name**: Descriptive warehouse name
+    - **Code**: Short identifier code
+    
+    **Optional Fields:**
+    - **Address**: Physical location
+    - **City**: City name
+    - **Phone**: Contact number
+    - **Active**: Toggle on/off (default: active)
+    
+    <Warning>
+      Name and Code are mandatory. The system will show a warning if either is missing.
+    </Warning>
+  </Step>
+
+  <Step title="Configure Warehouse Details">
+    Fill in the warehouse information:
+    
+    - **Name**: Use descriptive names like "Main Warehouse - Medellín" or "Retail Store #5"
+    - **Code**: Use consistent naming conventions (e.g., WH-001, STR-005)
+    - **Address**: Full street address for shipping and receiving
+    - **City**: City name for reporting and logistics
+    - **Phone**: Direct contact for warehouse staff
+    
+    <Info>
+      Warehouse codes should follow a consistent pattern across your organization for easy identification.
+    </Info>
+  </Step>
+
+  <Step title="Save Warehouse">
+    Click **Save** to create the warehouse. The system:
+    
+    1. Validates required fields (Name and Code)
+    2. Creates the warehouse record
+    3. Associates it with your company (companiaId)
+    4. Sets active status to true by default
+    5. Reloads the warehouse list
+    
+    The new warehouse is now available for inventory assignment.
+  </Step>
+
+  <Step title="Edit Existing Warehouse">
+    Click the **Edit** icon on any warehouse row to modify:
+    - Warehouse details
+    - Contact information
+    - Active status
+    
+    <Note>
+      Editing a warehouse does not affect existing inventory allocations. Stock remains in place.
+    </Note>
+  </Step>
+
+  <Step title="Deactivate Warehouse">
+    Instead of deleting, you can deactivate a warehouse:
+    
+    1. Click the **Delete** icon
+    2. System sets `active = false` (soft delete)
+    3. Warehouse is hidden from active lists
+    4. Historical data and inventory remain intact
+    
+    <Info>
+      Deactivating preserves data integrity. You can reactivate warehouses later if needed.
+    </Info>
+  </Step>
+</Steps>
+
+## Validation Rules
+
+### Name Field
+- **Required**: Yes
+- **Format**: Any text
+- **Best Practice**: Use descriptive, unique names
+- **Example**: "Main Distribution Center", "Retail Store Bogotá"
+
+### Code Field
+- **Required**: Yes
+- **Format**: Alphanumeric, typically short (3-10 characters)
+- **Best Practice**: Use consistent prefixes (WH-, STR-, DC-)
+- **Example**: "WH-001", "STR-BGT", "DC-MED"
+
+### Address Field
+- **Required**: No
+- **Format**: Free text
+- **Best Practice**: Use complete addresses for logistics
+- **Example**: "Calle 10 #43-21, Medellín, Antioquia"
+
+### City Field
+- **Required**: No
+- **Format**: Text
+- **Use**: Filtering, reporting, logistics planning
+
+### Phone Field
+- **Required**: No
+- **Format**: Phone number (format not enforced)
+- **Best Practice**: Include country/area codes
+- **Example**: "+57 300 123 4567"
+
+### Active Status
+- **Default**: true
+- **Type**: Boolean
+- **Purpose**: Soft delete mechanism
+
+## Search and Filter
+
+The component includes real-time search across multiple fields:
+
+```typescript
+filterWarehouses() {
+  const term = this.searchTerm.toLowerCase();
+  this.filteredWarehouses = this.warehouses.filter((b) =>
+    b.name.toLowerCase().includes(term) ||
+    b.code.toLowerCase().includes(term) ||
+    (b.city?.toLowerCase().includes(term) ?? false)
+  );
+}
+```
+
+Type in the search box to filter warehouses by:
+- **Name**: Full or partial name
+- **Code**: Warehouse code
+- **City**: City name
+
+## Inventory Integration
+
+Warehouses are linked to product inventory through the product management system:
+
+### Product-Warehouse Relationship
+
+Each product can have:
+- **Stock per warehouse**: Current inventory count
+- **Min/Max levels per warehouse**: Reorder thresholds
+
+```typescript
+export interface ProductStockByWarehouse {
+  wareHouse: string;        // Warehouse name
+  wareHouseId: number;      // Warehouse ID
+  stock: number;            // Current stock
+}
+
+export interface ProductMinMaxByWarehouse {
+  wareHouse: string;        // Warehouse name
+  wareHouseId: number;      // Warehouse ID
+  minStock: number;         // Minimum threshold
+  maxStock: number;         // Maximum threshold
+}
+```
+
+<Info>
+  When creating products, you can assign different stock levels and min/max thresholds for each warehouse.
+</Info>
+
+## Multi-Location Stock Tracking
+
+The warehouse system enables:
+
+1. **Stock Distribution**: View inventory across all locations
+2. **Location-Specific Sales**: Track which warehouse fulfills orders
+3. **Transfer Management**: Move inventory between warehouses
+4. **Reorder Alerts**: Get low-stock notifications per warehouse
+
+<Note>
+  The POS system automatically deducts stock from the selected warehouse when processing sales.
+</Note>
+
+## API Integration
+
+### Load Warehouses
+```typescript
+this.masterService.getWarehouses(this.companiaId).subscribe({
+  next: (res: ApiResponse<Warehouse[]>) => {
+    this.warehouses = res.data || [];
+    this.filteredWarehouses = this.warehouses;
+  }
+});
+```
+
+### Create or Update Warehouse
+```typescript
+this.masterService.createWarehouse(this.newWarehouse).subscribe({
+  next: (res) => {
+    if (res.code === 0) {
+      // Success
+      this.showDialog = false;
+      this.loadWarehouses();
+    }
+  }
+});
+```
+
+### Deactivate Warehouse (Soft Delete)
+```typescript
+deleteWarehouse(warehouse: Warehouse) {
+  const payload = { ...warehouse, active: false };
+  this.masterService.deleteWarehouse(payload).subscribe({
+    next: (res) => {
+      if (res.code === 0) {
+        this.loadWarehouses();
+      }
+    }
+  });
+}
+```
+
+<Info>
+  The system uses soft deletion (setting `active = false`) to preserve historical inventory data.
+</Info>
+
+## Permission Requirements
+
+The component implements role-based access control:
+
+```typescript
+private applyPermissions(): void {
+  const moduleName = 'Bodegas';
+  const permission = this.permissions.find((p) => 
+    p.module === moduleName
+  );
+  
+  this.canView = permission.canView;      // View warehouse list
+  this.canCreate = permission.canCreate;  // Create new warehouse
+  this.canEdit = permission.canEdit;      // Edit warehouse details
+  this.canDelete = permission.canDelete;  // Deactivate warehouse
+  this.canExport = permission.canExport;  // Export to Excel/CSV
+}
+```
+
+UI buttons are conditionally rendered:
+
+```html
+<button *ngIf="canCreate" (click)="openNewDialog()">New Warehouse</button>
+<button *ngIf="canEdit" (click)="editWarehouse(warehouse)">Edit</button>
+<button *ngIf="canDelete" (click)="deleteWarehouse(warehouse)">Delete</button>
+```
+
+## UI Components
+
+PrimeNG components used:
+
+- **Table**: Display warehouses with filtering
+- **Dialog**: Modal form for create/edit
+- **InputText**: Text fields for name, code, address, etc.
+- **InputSwitch**: Toggle active status
+- **Button**: Action buttons with icons
+- **Toast**: Success/error notifications
+- **TextArea**: Multi-line address input
+
+## Use Cases
+
+### Retail Chain
+```
+WH-001 | Main Distribution Center | Medellín
+STR-001 | Store #1 Bogotá | Bogotá
+STR-002 | Store #2 Cali | Cali
+STR-003 | Store #3 Medellín | Medellín
+```
+
+### Wholesale Distribution
+```
+DC-NORTH | Northern Distribution Center | Barranquilla
+DC-SOUTH | Southern Distribution Center | Pasto
+DC-EAST | Eastern Distribution Center | Villavicencio
+```
+
+### Manufacturing
+```
+RAW-MAT | Raw Materials Warehouse | Plant 1
+FIN-GOOD | Finished Goods Warehouse | Plant 1
+QUAL-CTL | Quality Control Hold Area | Plant 1
+```
+
+## Best Practices
+
+<Info>
+  **Consistent naming**: Use prefixes like WH-, STR-, DC- to quickly identify warehouse types.
+</Info>
+
+<Warning>
+  **Don't delete warehouses with inventory**: Always deactivate instead. Deleting can orphan inventory records.
+</Warning>
+
+<Note>
+  **Set up before adding products**: Create all warehouses before configuring product inventory to streamline setup.
+</Note>
+
+## Troubleshooting
+
+### Warehouse Not Saving
+- Verify Name and Code fields are filled
+- Check that you have `canCreate` or `canEdit` permission
+- Look for validation errors in browser console
+
+### Warehouse Not Appearing in Product Form
+- Ensure warehouse `active` status is true
+- Check that warehouse belongs to the same `companiaId`
+- Refresh the product management page
+
+### Can't Delete Warehouse
+- Verify you have `canDelete` permission
+- Check if inventory is still assigned to this warehouse
+- Review error message in toast notification
+
+### Stock Not Updating
+- Confirm sales are configured to deduct from correct warehouse
+- Check product's `manageStock` setting is enabled
+- Verify warehouse ID in stock allocation
+
+## Code Reference
+
+Key implementation files:
+
+- Component: `warehouses.component.ts:27-232`
+- Interface: `api/shared.ts:7-18`
+- Validation: `warehouses.component.ts:163-171`
+- Search Filter: `warehouses.component.ts:133-136`
+- Permissions: `warehouses.component.ts:90-113`
+- Soft Delete: `warehouses.component.ts:204-231`

@@ -1,0 +1,573 @@
+---
+title: 'Promotions System'
+description: 'Create and manage promotional campaigns with multiple discount types'
+icon: 'tags'
+---
+
+# Promotions System
+
+The promotions module provides a comprehensive solution for creating, managing, and tracking promotional campaigns. Support multiple promotion types including percentage discounts, fixed amounts, buy-X-get-Y deals, and product bundles.
+
+## Business Value
+
+<CardGroup cols={2}>
+  <Card title="Multiple Promotion Types" icon="percentage">
+    Support percentage, fixed amount, BOGO, and bundle promotions
+  </Card>
+  <Card title="Flexible Targeting" icon="bullseye">
+    Apply promotions to specific products or entire categories
+  </Card>
+  <Card title="Usage Tracking" icon="chart-bar">
+    Monitor promotion performance and customer engagement
+  </Card>
+  <Card title="Date-based Activation" icon="calendar">
+    Schedule promotions with automatic start and end dates
+  </Card>
+</CardGroup>
+
+## Promotion Types
+
+### 1. Percentage Discount
+
+Apply a percentage discount to selected products or categories:
+
+```typescript
+const percentagePromotion: Promotion = {
+  name: 'Summer Sale',
+  description: '20% off all beverages',
+  type: 'percentage',
+  value: 20,  // 20% discount
+  startDate: '2026-06-01',
+  endDate: '2026-08-31',
+  categoryIds: [1, 2, 3],  // Apply to specific categories
+  isActive: true
+};
+```
+
+<Note>
+  **Validation**: Percentage values must be between 0 and 100.
+</Note>
+
+### 2. Fixed Amount Discount
+
+Offer a fixed monetary discount:
+
+```typescript
+const fixedPromotion: Promotion = {
+  name: 'Holiday Special',
+  description: '$5,000 off purchases over $50,000',
+  type: 'fixed_amount',
+  value: 5000,        // Fixed discount amount
+  minPurchase: 50000, // Minimum purchase required
+  maxDiscount: 10000, // Maximum discount cap
+  startDate: '2026-12-01',
+  endDate: '2026-12-31',
+  productIds: [10, 20, 30],
+  isActive: true
+};
+```
+
+### 3. Buy X Get Y (BOGO)
+
+Create "buy X, get Y free" promotions:
+
+```typescript
+const bogoPromotion: Promotion = {
+  name: 'Buy 2 Get 1 Free',
+  description: 'Buy 2 sodas, get 1 free',
+  type: 'buy_x_get_y',
+  value: 2,    // Quantity to purchase
+  buyY: 1,     // Quantity to receive free
+  categoryIds: [5],        // Categories to purchase from
+  freeCategoryIds: [5],    // Categories to receive free
+  startDate: '2026-03-01',
+  endDate: '2026-03-31',
+  isActive: true
+};
+```
+
+<Tabs>
+  <Tab title="Category-based">
+    Select categories for both purchase (X) and free items (Y):
+    
+    ```typescript
+    buyXBy: 'category',  // Choose by category
+    freeYBy: 'category',
+    categoryIds: [1, 2],      // Purchase from these categories
+    freeCategoryIds: [3, 4]   // Get free from these categories
+    ```
+  </Tab>
+  
+  <Tab title="Product-based">
+    Select specific products for purchase and free items:
+    
+    ```typescript
+    buyXBy: 'product',   // Choose by product
+    freeYBy: 'product',
+    productIds: [101, 102],       // Purchase these products
+    freeProductIds: [103, 104]    // Get these products free
+    ```
+  </Tab>
+</Tabs>
+
+### 4. Bundle Promotion
+
+Create product bundles with special pricing:
+
+```typescript
+const bundlePromotion: Promotion = {
+  name: 'Breakfast Bundle',
+  description: 'Coffee + Bread combo',
+  type: 'bundle',
+  value: 15000,  // Bundle price
+  productIds: [5, 12, 18],  // Products in the bundle
+  startDate: '2026-01-01',
+  endDate: '2026-12-31',
+  isActive: true
+};
+```
+
+## Data Model
+
+### Promotion Interface
+
+```typescript
+export interface Promotion {
+  id?: number;
+  companiaId?: number;
+  userId?: number;
+  name: string;
+  description?: string;
+  type: "percentage" | "fixed_amount" | "buy_x_get_y" | "bundle";
+  value?: number;
+  minPurchase?: number;
+  maxDiscount?: number;
+  buyY?: number;           // For buy_x_get_y: free quantity
+  startDate?: string;
+  endDate?: string;
+  isActive?: boolean;
+  usageLimit?: number;
+  usageCount?: number;
+  
+  // Products/categories for purchase
+  categoryIds?: number[];
+  productIds?: number[];
+  
+  // Free products/categories (buy_x_get_y only)
+  freeCategoryIds?: number[];
+  freeProductIds?: number[];
+}
+```
+
+## Implementation Guide
+
+<Steps>
+  <Step title="Configure Module">
+    Import required modules and services:
+    
+    ```typescript
+    import { PromotionsService } from '../../services/promotions.service';
+    import { MasterService } from '../../services/master.service';
+    import { InventoryService } from '../../services/inventory.service';
+    
+    @Component({
+      selector: 'app-promotions',
+      standalone: true,
+      imports: [
+        CommonModule,
+        FormsModule,
+        CardModule,
+        TableModule,
+        DialogModule,
+        CalendarModule,
+        CheckboxModule,
+        InputNumberModule,
+        // ... other PrimeNG modules
+      ],
+      providers: [
+        MessageService,
+        PromotionsService,
+        MasterService,
+        InventoryService
+      ]
+    })
+    ```
+  </Step>
+
+  <Step title="Load Initial Data">
+    Fetch promotions, categories, and products:
+    
+    ```typescript
+    ngOnInit(): void {
+      const session = this.authService.getSession();
+      this.companiaId = session.companiaId;
+      this.userId = session.userId;
+      
+      this.loadPromotions();
+      this.loadCategories();
+      this.loadProducts();
+    }
+    
+    loadPromotions() {
+      this.promotionsService.getPromotions(this.companiaId).subscribe({
+        next: (res) => {
+          this.promotions = res.data || [];
+          // Normalize IDs to numbers
+          this.promotions = this.promotions.map(p => ({
+            ...p,
+            categoryIds: (p.categoryIds || []).map(id => 
+              typeof id === 'string' ? parseInt(id, 10) : id
+            )
+          }));
+        }
+      });
+    }
+    ```
+  </Step>
+
+  <Step title="Create a Promotion">
+    Build and validate promotion data:
+    
+    ```typescript
+    savePromotion() {
+      // Validate required fields
+      if (!this.currentPromotion.name?.trim()) {
+        this.messageService.add({ 
+          severity: 'error', 
+          detail: 'El nombre es obligatorio' 
+        });
+        return;
+      }
+      
+      // Validate percentage range
+      if (this.currentPromotion.type === 'percentage' && 
+          this.currentPromotion.value > 100) {
+        this.messageService.add({ 
+          severity: 'error', 
+          detail: 'El porcentaje no puede ser mayor a 100%' 
+        });
+        return;
+      }
+      
+      // Prepare payload
+      const promotionToSave: Promotion = {
+        ...this.currentPromotion,
+        companiaId: this.companiaId,
+        userId: this.userId,
+        startDate: this.startDateModel.toISOString().split('T')[0],
+        endDate: this.endDateModel.toISOString().split('T')[0],
+        categoryIds: this.normalizIds(this.currentPromotion.categoryIds),
+        productIds: this.normalizIds(this.currentPromotion.productIds)
+      };
+      
+      this.promotionsService.createPromotion(promotionToSave).subscribe({
+        next: (res) => {
+          this.messageService.add({
+            severity: 'success',
+            detail: 'Promoción creada correctamente.'
+          });
+          this.loadPromotions();
+        }
+      });
+    }
+    ```
+  </Step>
+
+  <Step title="Toggle Activation">
+    Enable or disable promotions:
+    
+    ```typescript
+    togglePromotionStatus(promotion: Promotion) {
+      const promotionToUpdate: Promotion = {
+        ...promotion,
+        companiaId: this.companiaId,
+        isActive: !promotion.isActive
+      };
+      
+      this.promotionsService.updatePromotion(promotionToUpdate).subscribe({
+        next: (res) => {
+          this.messageService.add({
+            severity: 'success',
+            detail: `Promoción ${promotionToUpdate.isActive ? 'activada' : 'desactivada'}.`
+          });
+          this.loadPromotions();
+        }
+      });
+    }
+    ```
+  </Step>
+</Steps>
+
+## Dynamic Form Behavior
+
+The promotion form adapts based on the selected type:
+
+```typescript
+onPromotionTypeChange() {
+  const t = this.currentPromotion.type;
+  
+  switch (t) {
+    case 'buy_x_get_y':
+      this.buyXBy = 'category';
+      this.freeYBy = 'category';
+      this.currentPromotion.minPurchase = undefined;
+      this.currentPromotion.maxDiscount = undefined;
+      if (!this.currentPromotion.buyY || this.currentPromotion.buyY < 1) {
+        this.currentPromotion.buyY = 1;
+      }
+      break;
+      
+    case 'percentage':
+    case 'fixed_amount':
+      this.currentPromotion.freeCategoryIds = [];
+      this.currentPromotion.freeProductIds = [];
+      this.currentPromotion.buyY = undefined;
+      break;
+      
+    case 'bundle':
+      this.currentPromotion.minPurchase = undefined;
+      this.currentPromotion.maxDiscount = undefined;
+      this.currentPromotion.buyY = undefined;
+      this.currentPromotion.freeCategoryIds = [];
+      this.currentPromotion.freeProductIds = [];
+      break;
+  }
+}
+```
+
+## Category and Product Selection
+
+### Multi-select with Checkboxes
+
+```typescript
+onCategoryChange(categoryId: number, event: any) {
+  if (event.checked) {
+    if (!this.currentPromotion.categoryIds) {
+      this.currentPromotion.categoryIds = [];
+    }
+    if (!this.currentPromotion.categoryIds.includes(categoryId)) {
+      this.currentPromotion.categoryIds = [
+        ...this.currentPromotion.categoryIds, 
+        categoryId
+      ];
+    }
+  } else {
+    this.currentPromotion.categoryIds = 
+      this.currentPromotion.categoryIds?.filter(c => c !== categoryId) || [];
+  }
+}
+
+isCategorySelected(categoryId: number | undefined): boolean {
+  if (!this.currentPromotion.categoryIds || !categoryId) return false;
+  
+  const normalizedCategoryId = typeof categoryId === 'string' 
+    ? parseInt(categoryId, 10) 
+    : Number(categoryId);
+  
+  return this.currentPromotion.categoryIds.some(id => {
+    const normalizedId = typeof id === 'string' 
+      ? parseInt(String(id), 10) 
+      : Number(id);
+    return !isNaN(normalizedId) && normalizedId === normalizedCategoryId;
+  });
+}
+```
+
+## Statistics Dashboard
+
+Track promotion performance:
+
+```typescript
+get activePromotions(): number {
+  return this.promotions.filter(p => p.isActive).length;
+}
+
+get totalUsage(): number {
+  return this.promotions.reduce((sum, p) => 
+    sum + (p.usageCount || 0), 0
+  );
+}
+
+get expiringSoon(): number {
+  return this.promotions.filter(p => {
+    if (!p.endDate) return false;
+    const endDate = new Date(p.endDate);
+    const today = new Date();
+    const diffTime = endDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays <= 7 && diffDays > 0;
+  }).length;
+}
+```
+
+## Filtering and Search
+
+```typescript
+get filteredPromotions(): Promotion[] {
+  return this.promotions.filter(promotion => {
+    const matchesSearch = promotion.name
+      .toLowerCase()
+      .includes(this.searchTerm.toLowerCase());
+    const matchesType = this.selectedType === 'all' || 
+                        promotion.type === this.selectedType;
+    return matchesSearch && matchesType;
+  });
+}
+```
+
+## UI Helpers
+
+### Badge Styling
+
+```typescript
+getPromotionTypeBadge(type: string): string {
+  switch (type) {
+    case 'percentage': return 'Porcentaje';
+    case 'fixed_amount': return 'Monto Fijo';
+    case 'buy_x_get_y': return 'Compra X Lleva Y';
+    case 'bundle': return 'Combo';
+    default: return type;
+  }
+}
+
+getPromotionTypeBadgeSeverity(type: string): 
+  'info' | 'success' | 'warn' | 'danger' | 'secondary' | 'contrast' {
+  switch (type) {
+    case 'percentage': return 'info';
+    case 'fixed_amount': return 'warn';
+    case 'buy_x_get_y': return 'success';
+    case 'bundle': return 'contrast';
+    default: return 'secondary';
+  }
+}
+
+getPromotionIconClass(type: string): string {
+  switch (type) {
+    case 'percentage': return 'pi pi-percent';
+    case 'fixed_amount': return 'pi pi-tag';
+    case 'buy_x_get_y': return 'pi pi-gift';
+    case 'bundle': return 'pi pi-star';
+    default: return 'pi pi-tag';
+  }
+}
+```
+
+## API Integration
+
+The promotions service provides full CRUD operations:
+
+```typescript
+@Injectable({ providedIn: 'root' })
+export class PromotionsService {
+  private apiUrl = 'https://localhost:7197/api/';
+
+  getPromotions(companiaId: number): Observable<ApiResponse<Promotion[]>> {
+    return this.http.get<ApiResponse<Promotion[]>>(
+      `${this.apiUrl}Promotion/GetPromotions/${companiaId}`
+    );
+  }
+
+  getPromotionById(id: number, companiaId: number): 
+    Observable<ApiResponse<Promotion[]>> {
+    return this.http.get<ApiResponse<Promotion[]>>(
+      `${this.apiUrl}Promotion/GetPromotionById/${id}/${companiaId}`
+    );
+  }
+
+  createPromotion(model: Promotion): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(
+      `${this.apiUrl}Promotion/CreatePromotion`, 
+      model
+    );
+  }
+
+  updatePromotion(model: Promotion): Observable<ApiResponse<any>> {
+    return this.http.put<ApiResponse<any>>(
+      `${this.apiUrl}Promotion/UpdatePromotion`, 
+      model
+    );
+  }
+
+  deletePromotion(model: Promotion): Observable<ApiResponse<any>> {
+    return this.http.request<ApiResponse<any>>(
+      'delete', 
+      `${this.apiUrl}Promotion/DeletePromotion`, 
+      { body: model }
+    );
+  }
+}
+```
+
+## Validation Rules
+
+<AccordionGroup>
+  <Accordion title="Required Fields">
+    - Promotion name
+    - Description
+    - Type (percentage, fixed_amount, buy_x_get_y, bundle)
+    - Value (must be > 0)
+    - Start and end dates
+  </Accordion>
+  
+  <Accordion title="Type-specific Validation">
+    **Percentage**: Value must be ≤ 100
+    
+    **Fixed Amount**: Discount must be less than minimum purchase
+    
+    **Buy X Get Y**: 
+    - Must specify buyY (quantity to receive free)
+    - Must select at least one purchase category/product
+    - Must select at least one free category/product
+  </Accordion>
+  
+  <Accordion title="Date Validation">
+    End date must be after start date:
+    
+    ```typescript
+    if (endDate < startDate) {
+      this.messageService.add({ 
+        severity: 'error',
+        detail: 'La fecha de fin debe ser posterior a la fecha de inicio' 
+      });
+      return;
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Permission System
+
+The module respects user permissions for the "Promociones" module:
+
+```typescript
+private applyPermissions(): void {
+  const moduleName = 'Promociones';
+  const permission = this.permissions.find(p => p.module === moduleName);
+  
+  if (!permission) {
+    this.resetPermissions();
+    return;
+  }
+  
+  this.canView = permission.canView;
+  this.canCreate = permission.canCreate;
+  this.canEdit = permission.canEdit;
+  this.canDelete = permission.canDelete;
+  this.canExport = permission.canExport;
+}
+```
+
+## Best Practices
+
+1. **Always normalize IDs**: Convert string IDs to numbers for consistent comparison
+2. **Validate dates**: Ensure promotion periods are valid and logical
+3. **Check permissions**: Verify user permissions before allowing operations
+4. **Track usage**: Monitor `usageCount` to measure promotion effectiveness
+5. **Clean up on type change**: Clear irrelevant fields when promotion type changes
+
+## Reference
+
+- Component: `~/workspace/source/src/app/components/pages/promotions/promotions.component.ts`
+- Lines: 1-1032
+- Service: `~/workspace/source/src/app/components/services/promotions.service.ts`
+- Interface: `~/workspace/source/src/app/components/pages/api/promotions.ts`

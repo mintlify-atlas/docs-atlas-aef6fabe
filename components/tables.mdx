@@ -1,0 +1,594 @@
+---
+title: 'Table Components & Data Display'
+description: 'Documentation for PrimeNG table components and data display patterns used throughout the application'
+---
+
+## Table Architecture
+
+The application uses **PrimeNG Table** (`p-table`) for all data grids with features like filtering, sorting, pagination, and responsive design.
+
+## Basic Table Pattern
+
+### Component Setup
+
+```typescript
+// src/app/components/pages/master/customers/customers.component.ts:38-48
+customers: Customer[] = [];
+filteredCustomers: Customer[] = [];
+
+loadCustomers() {
+    this.masterService.getClients(this.companiaId).subscribe({
+        next: (res) => {
+            if (res.code === 0) {
+                this.customers = res.data || [];
+                this.filteredCustomers = [...this.customers];
+            }
+        }
+    });
+}
+```
+
+### Table Template
+
+```html
+<p-table 
+    [value]="filteredCustomers" 
+    [paginator]="true" 
+    [rows]="10"
+    [rowsPerPageOptions]="[10, 25, 50]"
+    [showCurrentPageReport]="true"
+    currentPageReportTemplate="Mostrando {first} a {last} de {totalRecords} registros"
+    [globalFilterFields]="['firstName', 'lastName', 'document', 'email']"
+    styleClass="p-datatable-gridlines"
+    [tableStyle]="{ 'min-width': '50rem' }"
+>
+    <ng-template pTemplate="header">
+        <tr>
+            <th>ID</th>
+            <th pSortableColumn="firstName">
+                Nombre <p-sortIcon field="firstName"></p-sortIcon>
+            </th>
+            <th pSortableColumn="document">
+                Documento <p-sortIcon field="document"></p-sortIcon>
+            </th>
+            <th>Teléfono</th>
+            <th>Email</th>
+            <th>Acciones</th>
+        </tr>
+    </ng-template>
+    
+    <ng-template pTemplate="body" let-customer>
+        <tr>
+            <td>{{ customer.id }}</td>
+            <td>{{ customer.firstName }} {{ customer.lastName }}</td>
+            <td>{{ customer.document }}</td>
+            <td>{{ customer.phone }}</td>
+            <td>{{ customer.email }}</td>
+            <td>
+                <button 
+                    pButton 
+                    icon="pi pi-pencil" 
+                    class="p-button-rounded p-button-text"
+                    (click)="editCustomer(customer)"
+                ></button>
+                <button 
+                    pButton 
+                    icon="pi pi-trash" 
+                    class="p-button-rounded p-button-text p-button-danger"
+                    (click)="deleteCustomer(customer)"
+                ></button>
+            </td>
+        </tr>
+    </ng-template>
+    
+    <ng-template pTemplate="emptymessage">
+        <tr>
+            <td colspan="6" class="text-center py-8">
+                No se encontraron clientes
+            </td>
+        </tr>
+    </ng-template>
+</p-table>
+```
+
+<Note>
+The `pTemplate` directive provides named slots for header, body, and empty message.
+</Note>
+
+## Advanced Table Features
+
+### Sortable Columns
+
+```html
+<th pSortableColumn="price">
+    Precio <p-sortIcon field="price"></p-sortIcon>
+</th>
+```
+
+### Global Filter
+
+Add a search input that filters across multiple columns:
+
+```html
+<div class="flex justify-between items-center mb-4">
+    <span class="p-input-icon-left w-full md:w-auto">
+        <i class="pi pi-search"></i>
+        <input 
+            pInputText 
+            type="text" 
+            [(ngModel)]="searchTerm"
+            (input)="filterCustomers()"
+            placeholder="Buscar..."
+            class="w-full md:w-80"
+        />
+    </span>
+    
+    <button 
+        pButton 
+        label="Limpiar Filtros" 
+        icon="pi pi-filter-slash" 
+        (click)="resetFilters()"
+        class="p-button-outlined"
+    ></button>
+</div>
+```
+
+### Custom Filter Logic
+
+```typescript
+// src/app/components/pages/master/customers/customers.component.ts:156-164
+filterCustomers() {
+    const term = this.searchTerm.toLowerCase();
+    this.filteredCustomers = this.customers.filter((c) => 
+        `${c.firstName} ${c.lastName} ${c.businessName ?? ''} ${c.document}`
+            .toLowerCase()
+            .includes(term)
+    );
+}
+
+resetFilters() {
+    this.searchTerm = '';
+    this.filteredCustomers = [...this.customers];
+}
+```
+
+## Inventory Table Example
+
+A more complex table with nested data and custom columns:
+
+### Component Logic
+
+```typescript
+// src/app/components/pages/inventory/inventory.component.ts:39-67
+inventory: Product[] = [];
+filteredInventory: Product[] = [];
+
+filters = {
+    nameOrReference: '',
+    category: null,
+    extension1: '',
+    extension2: '',
+    unitMeasure: '',
+    active: true,
+    minPrice: null,
+    maxPrice: null
+};
+
+filterProducts() {
+    this.filteredInventory = this.inventory.filter((item) => {
+        const matchesSearch = 
+            !this.filters.nameOrReference ||
+            item.name.toLowerCase().includes(
+                this.filters.nameOrReference.toLowerCase()
+            ) ||
+            item.reference?.toLowerCase().includes(
+                this.filters.nameOrReference.toLowerCase()
+            ) ||
+            item.barcode?.toLowerCase().includes(
+                this.filters.nameOrReference.toLowerCase()
+            );
+        
+        const matchesCategory = 
+            !this.filters.category || 
+            item.categoryId === this.filters.category;
+        
+        const matchesExtension = 
+            !this.filters.extension1 || 
+            item.extension1?.toLowerCase().includes(
+                this.filters.extension1.toLowerCase()
+            );
+        
+        const matchesActive = item.active === this.filters.active;
+        
+        return matchesSearch && matchesCategory && 
+               matchesExtension && matchesActive;
+    });
+}
+```
+
+### Calculate Totals from Data
+
+```typescript
+// src/app/components/pages/inventory/inventory.component.ts:236-256
+getProductTotalStock(product: Product): number {
+    if (!product.existencias) return 0;
+    return product.existencias.reduce(
+        (acc, curr) => acc + (curr.stock || 0), 
+        0
+    );
+}
+
+calculateTotals() {
+    this.totalItems = 0;
+    this.totalValue = 0;
+    this.lowStockItems = [];
+    
+    this.inventory.forEach((item) => {
+        const stockTotal = this.getProductTotalStock(item);
+        this.totalItems += stockTotal;
+        this.totalValue += stockTotal * (item.price || 0);
+        
+        // Low stock detection
+        if (item.manageStock && stockTotal <= 5) {
+            this.lowStockItems.push(item);
+        }
+    });
+}
+```
+
+### Nested Data Display
+
+```html
+<p-table [value]="filteredInventory" ...>
+    <ng-template pTemplate="body" let-product>
+        <tr>
+            <td>{{ product.name }}</td>
+            <td>{{ product.reference }}</td>
+            <td>{{ product.price | currency:'COP':'symbol':'1.0-0':'es-CO' }}</td>
+            <td>
+                <!-- Display stock from multiple warehouses -->
+                <span class="font-bold">
+                    {{ getProductTotalStock(product) }}
+                </span>
+                <div class="text-xs text-gray-500 mt-1">
+                    @for (stock of product.existencias; track stock.wareHouseId) {
+                        <div>{{ stock.wareHouse }}: {{ stock.stock }}</div>
+                    }
+                </div>
+            </td>
+            <td>
+                <span 
+                    class="px-2 py-1 rounded text-xs font-bold"
+                    [ngClass]="{
+                        'bg-green-100 text-green-800': product.active,
+                        'bg-red-100 text-red-800': !product.active
+                    }"
+                >
+                    {{ product.active ? 'Activo' : 'Inactivo' }}
+                </span>
+            </td>
+        </tr>
+    </ng-template>
+</p-table>
+```
+
+<Tip>
+Use Angular's new `@for` control flow for cleaner nested iteration.
+</Tip>
+
+## Row Actions
+
+### Action Column Template
+
+```html
+<td>
+    <div class="flex gap-2">
+        <button 
+            *ngIf="canEdit"
+            pButton 
+            icon="pi pi-pencil" 
+            class="p-button-rounded p-button-text p-button-info"
+            pTooltip="Editar"
+            tooltipPosition="top"
+            (click)="editProduct(product)"
+        ></button>
+        
+        <button 
+            *ngIf="canDelete"
+            pButton 
+            icon="pi pi-trash" 
+            class="p-button-rounded p-button-text p-button-danger"
+            pTooltip="Eliminar"
+            tooltipPosition="top"
+            (click)="deleteProduct(product)"
+        ></button>
+        
+        <button 
+            pButton 
+            icon="pi pi-eye" 
+            class="p-button-rounded p-button-text"
+            pTooltip="Ver Detalles"
+            tooltipPosition="top"
+            (click)="viewDetails(product)"
+        ></button>
+    </div>
+</td>
+```
+
+### Confirmation Dialog
+
+```typescript
+// src/app/components/pages/master/customers/customers.component.ts:182-210
+deleteCustomer(customer: Customer) {
+    if (!confirm(`¿Deseas eliminar el cliente "${customer.firstName} ${customer.lastName}"?`)) {
+        return;
+    }
+    
+    this.masterService.DeleteClient(customer).subscribe({
+        next: (res) => {
+            if (res.code === 0) {
+                this.customers = this.customers.filter(
+                    (c) => c.id !== customer.id
+                );
+                this.filteredCustomers = [...this.customers];
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Eliminado',
+                    detail: res.message || 'Cliente eliminado correctamente.'
+                });
+            } else {
+                this.messageService.add({
+                    severity: 'warn',
+                    summary: 'Advertencia',
+                    detail: res.message || 'No se pudo eliminar el cliente.'
+                });
+            }
+        },
+        error: () => this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'No se pudo eliminar el cliente.'
+        })
+    });
+}
+```
+
+## Export Functionality
+
+### Export to Excel
+
+```typescript
+// src/app/components/pages/inventory/inventory.component.ts:365-403
+exportToExcel() {
+    // Prepare flattened data
+    const dataToExport = this.filteredInventory.map((p) => {
+        const row: any = {
+            ID: p.id,
+            Código: p.code,
+            Nombre: p.name,
+            Referencia: p.reference || '',
+            'Código Barras': p.barcode || '',
+            'Categoría ID': p.categoryId,
+            'Extension 1': p.extension1 || '',
+            'Extension 2': p.extension2 || '',
+            Precio: p.price,
+            'Unidad Medida ID': p.unitMeasureId,
+            'Maneja Stock': p.manageStock ? 'SI' : 'NO',
+            Activo: p.active ? 'SI' : 'NO'
+        };
+        
+        // Add dynamic columns for each warehouse
+        this.masterWarehouses.forEach((wh) => {
+            const stock = p.existencias?.find(
+                (e) => e.wareHouseId === wh.id
+            )?.stock || 0;
+            const min = p.maximosMinimos?.find(
+                (m) => m.wareHouseId === wh.id
+            )?.minStock || 0;
+            const max = p.maximosMinimos?.find(
+                (m) => m.wareHouseId === wh.id
+            )?.maxStock || 0;
+            
+            row[`Stock - ${wh.name}`] = stock;
+            row[`Min - ${wh.name}`] = min;
+            row[`Max - ${wh.name}`] = max;
+        });
+        
+        return row;
+    });
+    
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventario');
+    
+    XLSX.writeFile(workbook, `Inventario_Compania_${this.companiaId}.xlsx`);
+}
+```
+
+### Export Button
+
+```html
+<button 
+    *ngIf="canExport"
+    pButton 
+    label="Exportar a Excel" 
+    icon="pi pi-file-excel" 
+    (click)="exportToExcel()"
+    class="p-button-success"
+></button>
+```
+
+<Note>
+The app uses the `xlsx` library for Excel export functionality.
+</Note>
+
+## Bulk Import
+
+### Import from Excel
+
+```typescript
+// src/app/components/pages/inventory/inventory.component.ts:408-428
+importExcel(event: any) {
+    this.loading = true;
+    try {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e: any) => {
+            const bstr = e.target.result;
+            const wb = XLSX.read(bstr, { type: 'binary' });
+            const wsname = wb.SheetNames[0];
+            const ws = wb.Sheets[wsname];
+            const data: any[] = XLSX.utils.sheet_to_json(ws);
+            
+            this.processBulkData(data);
+        };
+        reader.readAsBinaryString(file);
+    } catch (error) {
+        this.loading = false;
+    }
+}
+```
+
+### Process Bulk Data
+
+```typescript
+// src/app/components/pages/inventory/inventory.component.ts:429-485
+processBulkData(rows: any[]) {
+    if (!rows || rows.length === 0) return;
+    
+    const requests: ProductCreateRequest[] = rows.map((row) => {
+        const warehousesForThisProduct = this.masterWarehouses.map((wh) => ({
+            warehouseId: wh.id!,
+            stock: Number(row[`Stock - ${wh.name}`] || 0),
+            minStock: Number(row[`Min - ${wh.name}`] || 0),
+            maxStock: Number(row[`Max - ${wh.name}`] || 0)
+        }));
+        
+        return {
+            id: Number(row['ID'] || 0),
+            userId: this.userId,
+            companiaId: this.companiaId,
+            name: row['Nombre'],
+            description: row['Descripción'] || '',
+            barcode: String(row['Código Barras'] || ''),
+            reference: String(row['Referencia'] || ''),
+            extension1: row['Extension 1'] || '',
+            extension2: row['Extension 2'] || '',
+            price: Number(row['Precio'] || 0),
+            imageUrl: row['Imagen URL'] || '',
+            categoryId: Number(row['Categoría ID']),
+            unitMeasureId: Number(row['Unidad Medida ID']),
+            active: row['Activo'] === 'SI',
+            manageStock: row['Maneja Stock'] === 'SI',
+            warehouses: warehousesForThisProduct
+        };
+    });
+    
+    this.inventoryService.createProductBulk(requests).subscribe({
+        next: () => {
+            this.loading = false;
+            this.messageService.add({
+                severity: 'success',
+                summary: 'Carga Masiva',
+                detail: `Se procesaron ${requests.length} productos exitosamente.`
+            });
+            this.loadInventory();
+        },
+        error: (err) => {
+            this.loading = false;
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Error en fila',
+                detail: `No se pudo cargar el archivo: ${err.message}`
+            });
+        }
+    });
+}
+```
+
+## Responsive Tables
+
+### Breakpoints Configuration
+
+```html
+<p-table 
+    [value]="data" 
+    [responsive]="true"
+    [breakpoint]="'960px'"
+    styleClass="p-datatable-gridlines p-datatable-sm"
+>
+    <!-- Table content -->
+</p-table>
+```
+
+### Mobile-Optimized Columns
+
+```html
+<th [style.display]="'none'" class="md:table-cell">Extension 1</th>
+<th [style.display]="'none'" class="md:table-cell">Extension 2</th>
+```
+
+## Table Styling
+
+### Status Badges
+
+```html
+<td>
+    <span 
+        class="px-3 py-1 rounded-full text-xs font-bold"
+        [ngClass]="{
+            'bg-green-100 text-green-800': item.active,
+            'bg-red-100 text-red-800': !item.active,
+            'bg-yellow-100 text-yellow-800': item.pending
+        }"
+    >
+        {{ item.active ? 'Activo' : 'Inactivo' }}
+    </span>
+</td>
+```
+
+### Currency Formatting
+
+```html
+<td class="text-right font-mono">
+    {{ product.price | currency:'COP':'symbol':'1.0-0':'es-CO' }}
+</td>
+```
+
+### Date Formatting
+
+```html
+<td>
+    {{ customer.createdAt | date:'dd/MM/yyyy HH:mm' }}
+</td>
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Separate Arrays" icon="list">
+    Maintain separate `data` and `filteredData` arrays for efficient filtering
+  </Card>
+  <Card title="Loading States" icon="spinner">
+    Show loading indicators during data fetch operations
+  </Card>
+  <Card title="Empty States" icon="inbox">
+    Always provide meaningful empty state messages
+  </Card>
+  <Card title="Pagination" icon="table-list">
+    Enable pagination for tables with more than 25 rows
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Services" icon="code" href="/components/services">
+    Learn about data service patterns
+  </Card>
+  <Card title="API Integration" icon="plug" href="/components/api-integration">
+    Explore API integration patterns
+  </Card>
+</CardGroup>

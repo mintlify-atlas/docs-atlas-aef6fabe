@@ -1,0 +1,261 @@
+---
+title: 'System Settings'
+description: 'Configure global system settings including printer, AI integration, notifications, and cloud storage'
+icon: 'gear'
+---
+
+## Overview
+
+The Settings module provides centralized configuration for critical system components in your POS application. Administrators can manage printer settings, AI integration with Google Gemini, notification preferences, and DigitalOcean Spaces cloud storage.
+
+<Note>
+  Access to Settings requires the **Configuración** module permission with `canView` enabled.
+</Note>
+
+## Component Location
+
+```
+~/workspace/source/src/app/components/pages/master/settings/settings.component.ts
+```
+
+## Data Models
+
+### PrinterSettings Interface
+
+<ParamField path="width" type="number" required>
+  Printer width in millimeters (typically 80mm for thermal printers)
+</ParamField>
+
+<ParamField path="marginTop" type="number" required>
+  Top margin in millimeters for receipt printing
+</ParamField>
+
+<ParamField path="copies" type="number" required>
+  Number of copies to print per transaction (default: 1)
+</ParamField>
+
+<ParamField path="port" type="string" required>
+  Printer port identifier (e.g., "USB001", "COM1")
+</ParamField>
+
+### AISettings Interface
+
+<ParamField path="geminiKey" type="string" required>
+  Google Gemini API key for AI-powered features
+</ParamField>
+
+<ParamField path="autoCategorize" type="boolean">
+  Enable automatic product categorization using AI (default: true)
+</ParamField>
+
+<ParamField path="salesAnalysis" type="boolean">
+  Enable AI-powered sales analysis and insights (default: true)
+</ParamField>
+
+### DigitalOceanSettings Interface
+
+<ParamField path="accessKey" type="string" required>
+  DigitalOcean Spaces access key for cloud storage
+</ParamField>
+
+<ParamField path="secretKey" type="string" required>
+  DigitalOcean Spaces secret key (stored securely)
+</ParamField>
+
+<ParamField path="serviceUrl" type="string" required>
+  DigitalOcean Spaces endpoint URL (e.g., "nyc3.digitaloceanspaces.com")
+</ParamField>
+
+<ParamField path="bucketName" type="string" required>
+  Name of the DigitalOcean Spaces bucket
+</ParamField>
+
+<ParamField path="url" type="string" required>
+  Public CDN URL for accessing stored files
+</ParamField>
+
+### NotificationsSettings
+
+<ParamField path="lowStock" type="boolean">
+  Enable notifications when product stock falls below minimum threshold
+</ParamField>
+
+<ParamField path="dailyReports" type="boolean">
+  Enable automated daily sales and inventory reports
+</ParamField>
+
+## Configuration Workflow
+
+<Steps>
+  <Step title="Access Settings">
+    Navigate to **Master > Settings** from the main menu. Ensure you have the `canView` permission for the **Configuración** module.
+  </Step>
+
+  <Step title="Configure Printer Settings">
+    Set up your thermal printer configuration:
+    - **Width**: Enter printer width (typically 80mm)
+    - **Top Margin**: Set margin spacing (typically 0-10mm)
+    - **Copies**: Number of receipt copies (1-3)
+    - **Port**: Select printer port (USB001, COM1, etc.)
+    
+    Click "Save" to apply printer settings.
+  </Step>
+
+  <Step title="Configure AI Integration">
+    Enable Google Gemini AI features:
+    - **API Key**: Enter your Google Gemini API key (minimum 20 characters)
+    - **Auto Categorize**: Toggle automatic product categorization
+    - **Sales Analysis**: Enable AI-powered sales insights
+    
+    <Warning>
+      The Gemini API key must be at least 20 characters long. Invalid keys will be rejected.
+    </Warning>
+    
+    Click "Save" to activate AI features.
+  </Step>
+
+  <Step title="Configure Cloud Storage">
+    Set up DigitalOcean Spaces for product images and documents:
+    - **Access Key**: Your DigitalOcean Spaces access key
+    - **Secret Key**: Your DigitalOcean Spaces secret key
+    - **Service URL**: Endpoint URL (e.g., nyc3.digitaloceanspaces.com)
+    - **Bucket Name**: Name of your storage bucket
+    - **CDN URL**: Public URL for file access
+    
+    <Info>
+      Secret keys are masked in the UI for security. Click the eye icon to reveal/hide.
+    </Info>
+  </Step>
+
+  <Step title="Configure Notifications">
+    Enable automated notifications:
+    - **Low Stock Alerts**: Get notified when inventory is low
+    - **Daily Reports**: Receive automated daily summaries
+    
+    Toggle switches to enable/disable each notification type.
+  </Step>
+
+  <Step title="Save Configuration">
+    After configuring all sections, click the **Save** button in each tab. Settings are saved per section and applied immediately.
+  </Step>
+</Steps>
+
+## Permission Requirements
+
+The Settings component implements role-based access control:
+
+```typescript
+const moduleName = 'Configuración';
+const permission = this.permissions.find((p) => p.module === moduleName);
+
+this.canView = permission.canView;      // View settings
+this.canEdit = permission.canEdit;      // Modify settings
+this.canCreate = permission.canCreate;  // Not typically used
+this.canDelete = permission.canDelete;  // Not typically used
+this.canExport = permission.canExport;  // Export configuration
+```
+
+<Note>
+  Users without `canView` permission will see an empty settings page or be redirected.
+</Note>
+
+## Validation Rules
+
+### Printer Settings
+- **Width**: Must be a positive number (typically 58mm or 80mm)
+- **Margin**: Must be 0 or greater
+- **Copies**: Must be between 1 and 3
+- **Port**: Cannot be empty
+
+### AI Settings
+- **Gemini API Key**: Minimum 20 characters
+- Key format validation is performed on save
+
+### DigitalOcean Settings
+- All fields are required for cloud storage to function
+- Invalid credentials will prevent file uploads
+
+## API Integration
+
+Settings are managed through the `MasterService`:
+
+```typescript
+// Load current configuration
+this.masterService.getConfiguration(companiaId).subscribe({
+  next: (res) => {
+    if (res.code === 0 && res.data) {
+      // Apply settings to UI
+    }
+  }
+});
+
+// Save configuration
+const request: ConfigurationRequest = {
+  companyId: this.companiaId,
+  printerWidthMM: this.printerSettings.width,
+  printerTopMargin: this.printerSettings.marginTop,
+  printerCopies: this.printerSettings.copies,
+  printerPort: this.printerSettings.port,
+  geminiApiKey: this.aiSettings.geminiKey,
+  notifyLowStock: this.notifications.lowStock,
+  notifyDailyReports: this.notifications.dailyReports,
+  accessKey: this.digitalOcean.accessKey,
+  secretKey: this.digitalOcean.secretKey,
+  serviceUrl: this.digitalOcean.serviceUrl,
+  bucketName: this.digitalOcean.bucketName,
+  url: this.digitalOcean.url
+};
+
+this.masterService.saveConfiguration(request).subscribe(...);
+```
+
+## UI Components
+
+The Settings module uses PrimeNG components:
+
+- **TabView**: Organize settings into logical sections
+- **InputText**: Text input for keys and URLs
+- **InputSwitch**: Toggle for boolean settings
+- **Button**: Save actions for each section
+- **Toast**: Success/error notifications
+- **Card**: Visual grouping of related settings
+
+## Best Practices
+
+<Info>
+  **Test printer settings** before production use. Print a test receipt to verify width, margins, and port configuration.
+</Info>
+
+<Warning>
+  **Protect API keys and secrets**. Never commit credentials to version control. Use environment variables in production.
+</Warning>
+
+<Note>
+  **Backup your configuration** before making changes. Export settings using the `canExport` permission.
+</Note>
+
+## Troubleshooting
+
+### Printer Not Working
+- Verify the port setting matches your system's printer port
+- Ensure printer drivers are installed
+- Check that width matches your printer's paper size
+
+### AI Features Not Responding
+- Validate that your Gemini API key is active
+- Check API quota limits in Google Cloud Console
+- Ensure the key has the correct permissions
+
+### Cloud Storage Upload Failures
+- Verify DigitalOcean Spaces credentials
+- Check bucket permissions (public read recommended)
+- Ensure service URL matches your region
+
+## Code Reference
+
+Key implementation files:
+
+- Component: `settings.component.ts:27-240`
+- Interfaces: `api/settings.ts:27-41`, `api/master.ts:35-54`
+- Service: `MasterService.getConfiguration()`, `MasterService.saveConfiguration()`
+- Permissions: Applied at `settings.component.ts:110-125`

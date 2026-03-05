@@ -1,0 +1,633 @@
+---
+title: 'Customer Management'
+description: 'Comprehensive customer database with support for individuals and companies, including contact details and transaction history'
+icon: 'users'
+---
+
+# Customer Management
+
+The Customer Management module provides a complete CRM system for managing customer information, supporting both individual consumers and business clients with comprehensive contact and identification details.
+
+## Overview
+
+Built with Angular 19 and PrimeNG Table, this module offers full CRUD operations for customers with advanced filtering, search capabilities, and integration with the POS and invoicing systems.
+
+**Location**: `~/workspace/source/src/app/components/pages/master/customers/customers.component.ts`
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Individual & Business" icon="building">
+    Support for both individual consumers and business entities with different fields
+  </Card>
+  <Card title="Full Contact Info" icon="address-card">
+    Store names, emails, phones, addresses, and location details
+  </Card>
+  <Card title="Advanced Search" icon="magnifying-glass">
+    Filter by name, document, NIT, or any customer field
+  </Card>
+  <Card title="POS Integration" icon="cash-register">
+    Seamlessly select customers during sales transactions
+  </Card>
+</CardGroup>
+
+## Customer Data Model
+
+The complete customer interface supports extensive information:
+
+```typescript
+export interface Customer {
+    id: number;
+    companiaId: number;
+    userId: number;
+    identificationTypeId: number;
+    document: string;
+    firstName: string;
+    middleName?: string;
+    lastName: string;
+    secondLastName?: string;
+    phone?: string;
+    email: string;
+    
+    // Location data
+    city?: string;
+    department?: string;
+    country?: string;
+    address?: string;
+    
+    // Business data
+    isCompany: boolean;
+    nit?: string;
+    businessName?: string;
+    
+    // Audit trail
+    createdAt?: Date;
+    updatedAt?: Date;
+}
+```
+**Source**: `src/app/components/pages/api/shared.ts:128-155`
+
+<Info>
+  The `isCompany` flag determines whether to use individual fields (firstName, lastName) or business fields (businessName, NIT).
+</Info>
+
+## Component Architecture
+
+### Core Properties
+
+```typescript
+export class CustomersComponent implements OnInit {
+    // Main data
+    customers: Customer[] = [];
+    filteredCustomers: Customer[] = [];
+    
+    // UI state
+    searchTerm: string = '';
+    showDialog = false;
+    isEditing = false;
+    
+    // Form
+    currentCustomer: Customer = this.getEmptyCustomer();
+    
+    // Identification types
+    identificationTypes: any[] = [
+        { label: 'CC', value: 1 },   // Cédula de Ciudadanía
+        { label: 'TI', value: 2 },   // Tarjeta de Identidad
+        { label: 'PAS', value: 3 },  // Pasaporte
+        { label: 'NIT', value: 4 }   // Número de Identificación Tributaria
+    ];
+    
+    // Permissions
+    canView = false;
+    canCreate = false;
+    canEdit = false;
+    canDelete = false;
+    canExport = false;
+    
+    companiaId: number = 0;
+    userId: number = 0;
+}
+```
+**Source**: `customers.component.ts:34-68`
+
+## Loading Customers
+
+Customers are loaded from the MasterService:
+
+```typescript
+loadCustomers() {
+    this.masterService.getClients(this.companiaId).subscribe({
+        next: (res) => {
+            if (res.code === 0) {
+                this.customers = res.data || [];
+                this.filteredCustomers = [...this.customers];
+            } else {
+                this.messageService.add({
+                    severity: 'warn',
+                    summary: 'Advertencia',
+                    detail: res.message || 'No se pudieron cargar los clientes.'
+                });
+            }
+        },
+        error: () => {
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Error',
+                detail: 'Error al cargar los clientes desde el servidor.'
+            });
+        }
+    });
+}
+```
+**Source**: `customers.component.ts:129-151`
+
+## Search and Filtering
+
+### Real-Time Search
+
+The search filters across multiple fields:
+
+```typescript
+filterCustomers() {
+    const term = this.searchTerm.toLowerCase();
+    this.filteredCustomers = this.customers.filter((c) =>
+        `${c.firstName} ${c.lastName} ${c.businessName ?? ''} ${c.document}`
+            .toLowerCase()
+            .includes(term)
+    );
+}
+```
+**Source**: `customers.component.ts:156-159`
+
+This searches through:
+- First name
+- Last name  
+- Business name (for companies)
+- Document/ID number
+
+### Reset Filters
+
+```typescript
+resetFilters() {
+    this.searchTerm = '';
+    this.filteredCustomers = [...this.customers];
+}
+```
+**Source**: `customers.component.ts:161-164`
+
+## CRUD Operations
+
+### Create Customer
+
+<Steps>
+  <Step title="Open Dialog">
+    Click "Nuevo Cliente" to open the creation form:
+    
+    ```typescript
+    openAddDialog() {
+        this.currentCustomer = this.getEmptyCustomer();
+        this.isEditing = false;
+        this.showDialog = true;
+    }
+    ```
+    **Source**: `customers.component.ts:170-174`
+  </Step>
+  
+  <Step title="Fill Form">
+    The empty customer template includes default values:
+    
+    ```typescript
+    private getEmptyCustomer(): Customer {
+        return {
+            id: 0,
+            companiaId: this.companiaId,
+            userId: this.userId,
+            identificationTypeId: 1,  // Default to CC
+            document: '',
+            firstName: '',
+            middleName: '',
+            lastName: '',
+            secondLastName: '',
+            phone: '',
+            email: '',
+            city: '',
+            department: '',
+            country: '',
+            address: '',
+            isCompany: false,  // Default to individual
+            nit: '',
+            businessName: '',
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+    }
+    ```
+    **Source**: `customers.component.ts:258-281`
+  </Step>
+  
+  <Step title="Validate and Save">
+    The save function validates required fields:
+    
+    ```typescript
+    saveCustomer() {
+        if (!this.currentCustomer.firstName || 
+            !this.currentCustomer.document || 
+            !this.currentCustomer.email) {
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Campos requeridos',
+                detail: 'Debe completar los campos obligatorios.'
+            });
+            return;
+        }
+        
+        const operation = this.masterService.CreateClient(this.currentCustomer);
+        
+        operation.subscribe({
+            next: (res) => {
+                if (res.code === 0) {
+                    this.messageService.add({
+                        severity: 'success',
+                        summary: 'Éxito',
+                        detail: res.message || 'Operación realizada correctamente.'
+                    });
+                    this.showDialog = false;
+                    this.loadCustomers();
+                }
+            }
+        });
+    }
+    ```
+    **Source**: `customers.component.ts:212-249`
+  </Step>
+</Steps>
+
+<Warning>
+  Required fields: `firstName`, `document`, and `email`. The form will show a warning if these are missing.
+</Warning>
+
+### Edit Customer
+
+```typescript
+editCustomer(customer: Customer) {
+    this.currentCustomer = { ...customer };  // Clone to avoid mutations
+    this.isEditing = true;
+    this.showDialog = true;
+}
+```
+**Source**: `customers.component.ts:176-180`
+
+<Note>
+  The component uses object spreading (`{ ...customer }`) to create a copy, preventing direct mutations to the table data before save.
+</Note>
+
+### Delete Customer
+
+Deletion requires confirmation:
+
+```typescript
+deleteCustomer(customer: Customer) {
+    if (!confirm(`¿Deseas eliminar el cliente "${customer.firstName} ${customer.lastName}"?`)) {
+        return;
+    }
+    
+    this.masterService.DeleteClient(customer).subscribe({
+        next: (res) => {
+            if (res.code === 0) {
+                this.customers = this.customers.filter(
+                    (c) => c.id !== customer.id
+                );
+                this.filteredCustomers = [...this.customers];
+                this.messageService.add({
+                    severity: 'success',
+                    summary: 'Eliminado',
+                    detail: res.message || 'Cliente eliminado correctamente.'
+                });
+            } else {
+                this.messageService.add({
+                    severity: 'warn',
+                    summary: 'Advertencia',
+                    detail: res.message || 'No se pudo eliminar el cliente.'
+                });
+            }
+        },
+        error: () => this.messageService.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'No se pudo eliminar el cliente.'
+        })
+    });
+}
+```
+**Source**: `customers.component.ts:182-210`
+
+## Identification Types
+
+The system supports multiple ID types common in Latin America:
+
+<Tabs>
+  <Tab title="Colombia">
+    | Type | Code | Description |
+    |------|------|-------------|
+    | **CC** | 1 | Cédula de Ciudadanía (National ID) |
+    | **TI** | 2 | Tarjeta de Identidad (Minor's ID) |
+    | **PAS** | 3 | Pasaporte (Passport) |
+    | **NIT** | 4 | Número de Identificación Tributaria (Tax ID) |
+  </Tab>
+  
+  <Tab title="Configuration">
+    ```typescript
+    identificationTypes: any[] = [
+        { label: 'CC', value: 1 },
+        { label: 'TI', value: 2 },
+        { label: 'PAS', value: 3 },
+        { label: 'NIT', value: 4 }
+    ];
+    ```
+    **Source**: `customers.component.ts:55-60`
+  </Tab>
+</Tabs>
+
+<Info>
+  NIT is typically used for business entities (`isCompany: true`) while CC, TI, and PAS are for individuals.
+</Info>
+
+## Individual vs. Business
+
+The form adapts based on customer type:
+
+### Individual Customer
+```typescript
+{
+    isCompany: false,
+    firstName: 'Juan',
+    middleName: 'Carlos',
+    lastName: 'García',
+    secondLastName: 'López',
+    identificationTypeId: 1,  // CC
+    document: '12345678',
+    email: 'juan.garcia@email.com',
+    phone: '3001234567'
+}
+```
+
+### Business Customer
+```typescript
+{
+    isCompany: true,
+    businessName: 'Comercializadora XYZ S.A.S.',
+    nit: '900123456-7',
+    identificationTypeId: 4,  // NIT
+    document: '900123456',
+    email: 'contacto@comercializadoraxyz.com',
+    phone: '6011234567'
+}
+```
+
+<Warning>
+  When `isCompany` is true, the `firstName` and `lastName` fields may be empty. Always check `businessName` for company customers.
+</Warning>
+
+## Integration with POS
+
+Customers are selected during sales transactions using the CustomerSelectorComponent:
+
+### Loading in POS
+
+```typescript
+// In POS Component
+loadCustomers() {
+    this.masterService.getClients(this.companiaId).subscribe({
+        next: (res) => {
+            if (res.code === 0) {
+                this.customers = res.data || [];
+            }
+        }
+    });
+}
+```
+**Source**: `pos.component.ts:200-222`
+
+### Customer on Invoice
+
+When saving an invoice, customer info is embedded:
+
+```typescript
+saveInvoice(invoice: Invoice) {
+    const payload = {
+        // ...
+        clientId: invoice.customer?.id || null,
+        clientName: invoice.customer?.businessName || 
+            `${invoice.customer?.firstName ?? ''} ${invoice.customer?.lastName ?? ''}`.trim() || 
+            'Consumidor Final',
+        clientNit: invoice.customer?.nit || invoice.customer?.document || '',
+        // ...
+    };
+}
+```
+**Source**: `pos.component.ts:497-499`
+
+<Note>
+  If no customer is selected, invoices default to "Consumidor Final" (Final Consumer).
+</Note>
+
+## Permissions
+
+The module checks permissions for the "Clientes" module:
+
+```typescript
+private applyPermissions(): void {
+    const moduleName = 'Clientes';
+    const permission = this.permissions.find((p) => p.module === moduleName);
+    
+    if (!permission) {
+        this.resetPermissions();
+        return;
+    }
+    
+    this.canView = permission.canView;
+    this.canCreate = permission.canCreate;
+    this.canEdit = permission.canEdit;
+    this.canDelete = permission.canDelete;
+    this.canExport = permission.canExport;
+}
+
+private resetPermissions(): void {
+    this.canView = false;
+    this.canCreate = false;
+    this.canEdit = false;
+    this.canDelete = false;
+    this.canExport = false;
+}
+```
+**Source**: `customers.component.ts:100-123`
+
+## Services Used
+
+<CardGroup cols={2}>
+  <Card title="MasterService" icon="database">
+    Provides all customer CRUD operations:
+    - `getClients(companiaId)`
+    - `CreateClient(customer)`
+    - `DeleteClient(customer)`
+  </Card>
+  <Card title="MessageService" icon="message">
+    PrimeNG service for toast notifications on success/error
+  </Card>
+  <Card title="AuthService" icon="shield">
+    Provides session context (companiaId, userId)
+  </Card>
+  <Card title="LoginService" icon="key">
+    Loads user permissions for the Clientes module
+  </Card>
+</CardGroup>
+
+## UI Components
+
+Built with PrimeNG components:
+
+```typescript
+imports: [
+    CommonModule,
+    FormsModule,
+    TableModule,        // Customer list table
+    DialogModule,       // Add/Edit modal
+    DropdownModule,     // Identification type selector
+    InputTextModule,    // Text inputs
+    InputSwitchModule,  // isCompany toggle
+    ButtonModule,       // Action buttons
+    ToastModule,        // Notifications
+    ToggleSwitchModule, // Active status toggle
+    RippleModule        // Material ripple effect
+]
+```
+**Source**: `customers.component.ts:29`
+
+## Best Practices
+
+<Steps>
+  <Step title="Validate Email Format">
+    Always validate email addresses to ensure proper communication and prevent typos.
+  </Step>
+  
+  <Step title="Use Proper ID Types">
+    Select the correct identification type:
+    - CC/TI/PAS for individuals
+    - NIT for companies
+  </Step>
+  
+  <Step title="Complete Contact Info">
+    Fill in phone, address, and location details for better customer service and delivery management.
+  </Step>
+  
+  <Step title="Business Name Consistency">
+    For companies, use the legal business name as it appears on tax documents.
+  </Step>
+  
+  <Step title="Search Before Creating">
+    Always search for existing customers before creating new ones to avoid duplicates.
+  </Step>
+</Steps>
+
+## Extending the Module
+
+### Add Purchase History
+
+```typescript
+interface CustomerWithHistory extends Customer {
+    totalPurchases: number;
+    lastPurchaseDate: Date;
+    averageTicket: number;
+}
+
+loadCustomerHistory(customerId: number) {
+    this.posService.getCustomerInvoices(customerId).subscribe({
+        next: (res) => {
+            const invoices = res.data;
+            // Calculate statistics
+            const totalPurchases = invoices.reduce(
+                (sum, inv) => sum + inv.total, 0
+            );
+            const averageTicket = totalPurchases / invoices.length;
+            // ...
+        }
+    });
+}
+```
+
+### Export Customer List
+
+```typescript
+exportCustomers() {
+    const dataToExport = this.filteredCustomers.map(c => ({
+        'Tipo ID': this.identificationTypes.find(
+            t => t.value === c.identificationTypeId
+        )?.label,
+        'Documento': c.document,
+        'Nombre': c.isCompany ? c.businessName : 
+            `${c.firstName} ${c.lastName}`,
+        'Email': c.email,
+        'Teléfono': c.phone,
+        'Ciudad': c.city,
+        'Dirección': c.address,
+        'Tipo': c.isCompany ? 'Empresa' : 'Persona'
+    }));
+    
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+    XLSX.writeFile(wb, 'Clientes.xlsx');
+}
+```
+
+### Add Customer Notes
+
+```typescript
+interface Customer {
+    // ... existing fields
+    notes?: string;
+    tags?: string[];  // e.g., ['VIP', 'Frequent Buyer']
+}
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Duplicate customers appearing">
+    Search by document number before creating. Consider adding a unique constraint on `document` + `companiaId` in the database.
+  </Accordion>
+  
+  <Accordion title="Cannot save customer">
+    Check that all required fields are filled:
+    - firstName (or businessName if isCompany)
+    - document
+    - email
+    
+    Verify email format is valid.
+  </Accordion>
+  
+  <Accordion title="Customer not appearing in POS">
+    Ensure the customer was saved successfully and refresh the POS customer list. Check that `companiaId` matches.
+  </Accordion>
+  
+  <Accordion title="Wrong identification type selected">
+    CC/TI/PAS are for individuals. NIT is for companies. Change the customer's `identificationTypeId` to match their document type.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="POS System" icon="cash-register" href="/features/pos-system">
+    Select customers during sales transactions
+  </Card>
+  <Card title="Invoicing" icon="file-invoice" href="/features/invoicing">
+    View customer purchase history through invoices
+  </Card>
+  <Card title="Reports" icon="chart-bar" href="/features/reports">
+    Analyze customer purchase patterns
+  </Card>
+  <Card title="Permissions" icon="shield" href="/admin/permissions">
+    Configure who can manage customer data
+  </Card>
+</CardGroup>

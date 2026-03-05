@@ -1,0 +1,278 @@
+---
+title: Development Environment Setup
+description: Complete guide to setting up your local development environment for the POS application
+---
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed on your development machine:
+
+<Steps>
+  <Step title="Node.js">
+    Install Node.js **v18** or higher. We recommend using [nvm](https://github.com/nvm-sh/nvm) for version management.
+    
+    ```bash
+    node --version  # Should be v18.x or higher
+    npm --version   # Should be v9.x or higher
+    ```
+  </Step>
+
+  <Step title="Git">
+    Install [Git](https://git-scm.com/) for version control.
+    
+    ```bash
+    git --version
+    ```
+  </Step>
+
+  <Step title="Code Editor">
+    We recommend [Visual Studio Code](https://code.visualstudio.com/) with the following extensions:
+    - Angular Language Service
+    - ESLint
+    - Prettier - Code formatter
+    - Tailwind CSS IntelliSense
+  </Step>
+</Steps>
+
+## Installation
+
+### Clone the Repository
+
+```bash
+git clone <repository-url>
+cd sakai-ng
+```
+
+### Install Dependencies
+
+```bash
+npm install
+```
+
+This will install all the required dependencies specified in `package.json`:
+
+**Core Dependencies:**
+- Angular 19.0.0
+- PrimeNG 19.0.8
+- Tailwind CSS 3.4.17
+- RxJS 7.8.0
+- SignalR 10.0.0
+
+**Dev Dependencies:**
+- TypeScript 5.6.2
+- ESLint 9.14.0
+- Prettier 3.0.0
+- Karma/Jasmine (Testing)
+
+## Development Server
+
+### Start the Development Server
+
+```bash
+npm start
+```
+
+This runs `ng serve` and starts the development server at:
+
+```
+http://localhost:4200
+```
+
+The application will automatically reload if you change any source files.
+
+### Watch Mode
+
+For continuous builds during development:
+
+```bash
+npm run watch
+```
+
+This runs the build in watch mode with the development configuration.
+
+## TypeScript Configuration
+
+The project uses strict TypeScript settings for type safety:
+
+<CodeGroup>
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "outDir": "./dist/out-tsc",
+    "strict": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "moduleResolution": "bundler",
+    "importHelpers": true,
+    "target": "ES2022",
+    "module": "ES2022"
+  }
+}
+```
+
+```json tsconfig.app.json
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/app",
+    "types": []
+  },
+  "files": [
+    "src/main.ts"
+  ],
+  "include": [
+    "src/**/*.d.ts"
+  ]
+}
+```
+</CodeGroup>
+
+### Key TypeScript Features
+
+- **Strict Mode**: Enabled for maximum type safety
+- **Experimental Decorators**: Required for Angular dependency injection
+- **ES2022**: Modern JavaScript features
+- **No Implicit Any**: All types must be explicitly defined
+
+## Angular Configuration
+
+### Project Settings
+
+The `angular.json` file defines the build configuration:
+
+```json
+{
+  "projectType": "application",
+  "sourceRoot": "src",
+  "prefix": "app",
+  "inlineStyleLanguage": "scss"
+}
+```
+
+### Build Configurations
+
+<Tabs>
+  <Tab title="Development">
+    ```json
+    {
+      "optimization": false,
+      "extractLicenses": false,
+      "sourceMap": true
+    }
+    ```
+    
+    Use for local development with full debugging support.
+  </Tab>
+  
+  <Tab title="Production">
+    ```json
+    {
+      "budgets": [
+        {
+          "type": "initial",
+          "maximumWarning": "1mb",
+          "maximumError": "5mb"
+        },
+        {
+          "type": "anyComponentStyle",
+          "maximumWarning": "2kb",
+          "maximumError": "4kb"
+        }
+      ],
+      "outputHashing": "all"
+    }
+    ```
+    
+    Optimized build with size budgets and cache busting.
+  </Tab>
+</Tabs>
+
+## Environment Variables
+
+<Tip>
+The application uses Angular's environment files for configuration. Create environment-specific files in `src/environments/` as needed.
+</Tip>
+
+## Package Scripts
+
+Available npm scripts from `package.json`:
+
+| Script | Command | Description |
+|--------|---------|-------------|
+| `start` | `ng serve` | Start development server |
+| `build` | `ng build` | Build for production |
+| `watch` | `ng build --watch --configuration development` | Build in watch mode |
+| `test` | `ng test` | Run unit tests |
+| `format` | `prettier --write "**/*.{js,mjs,ts,mts,d.ts,html}" --cache` | Format code |
+
+## Verify Installation
+
+To verify your setup is working correctly:
+
+<Steps>
+  <Step title="Check Dependencies">
+    ```bash
+    npm list --depth=0
+    ```
+  </Step>
+
+  <Step title="Run Build">
+    ```bash
+    npm run build
+    ```
+    
+    Should complete without errors.
+  </Step>
+
+  <Step title="Start Server">
+    ```bash
+    npm start
+    ```
+    
+    Navigate to `http://localhost:4200` and verify the app loads.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Port Already in Use
+
+If port 4200 is already in use:
+
+```bash
+ng serve --port 4201
+```
+
+### Node Modules Issues
+
+Clear node_modules and reinstall:
+
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### TypeScript Errors
+
+Ensure you're using TypeScript 5.6.2:
+
+```bash
+npx tsc --version
+```
+
+<Warning>
+Do not upgrade TypeScript independently - it's locked to version 5.6.2 for compatibility with Angular 19.
+</Warning>
+
+## Next Steps
+
+- Review the [Application Architecture](/development/architecture)
+- Understand [Routing Configuration](/development/routing)
+- Learn about [Code Standards](/development/code-standards)
+- Set up [Testing](/development/testing)

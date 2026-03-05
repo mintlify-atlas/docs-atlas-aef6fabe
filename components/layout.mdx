@@ -1,0 +1,491 @@
+---
+title: 'Layout Components'
+description: 'Documentation for the main layout components including sidebar, topbar, and layout service'
+---
+
+## Layout Architecture
+
+The application uses a **fixed sidebar + header layout** with a responsive design that adapts to mobile and desktop viewports.
+
+## Main Layout Component
+
+The `AppLayout` component serves as the primary layout wrapper:
+
+```typescript
+// src/app/layout/component/app.layout.ts:10-13
+@Component({
+    selector: 'app-layout',
+    standalone: true,
+    imports: [CommonModule, AppTopbar, AppSidebar, RouterModule, AppFooter],
+    template: `...`
+})
+export class AppLayout { ... }
+```
+
+### Layout Structure
+
+```html
+<div class="fixed inset-0 w-screen h-screen bg-[#F8FAFC] 
+            flex overflow-hidden">
+    <!-- Sidebar (320px width) -->
+    <aside class="w-80 h-full bg-[#F8FAFC] border-r flex flex-col">
+        <!-- Brand Header -->
+        <div class="h-20 flex items-center px-8 bg-white">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-blue-600 rounded-xl 
+                            flex items-center justify-center">
+                    <i class="pi pi-bolt text-white text-xl"></i>
+                </div>
+                <span class="text-2xl font-black uppercase">
+                    NEIDSOFT <span class="text-blue-600">POS</span>
+                </span>
+            </div>
+        </div>
+        
+        <!-- Scrollable Menu -->
+        <div class="flex-1 overflow-y-auto py-8">
+            <app-sidebar></app-sidebar>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col min-w-0">
+        <!-- Top Header (80px height) -->
+        <header class="h-20 flex-none px-8 flex items-center bg-white">
+            <app-topbar class="w-full"></app-topbar>
+        </header>
+        
+        <!-- Scrollable Content -->
+        <main class="flex-1 overflow-y-auto bg-[#F8FAFC]">
+            <div class="p-6 lg:p-12 max-w-[1600px] mx-auto">
+                <router-outlet></router-outlet>
+            </div>
+            <footer class="py-10 border-t bg-[#F8FAFC]">
+                <app-footer></app-footer>
+            </footer>
+        </main>
+    </div>
+</div>
+```
+
+<Note>
+The layout uses a **fixed viewport** approach with internal scrolling for sidebar and content areas.
+</Note>
+
+## Topbar Component
+
+The topbar displays user information, company selector, and global actions.
+
+### Key Features
+
+<Tabs>
+  <Tab title="Company Selector">
+    ```typescript
+    // src/app/layout/component/app.topbar.ts:125-153
+    selectedCompany: ICompanySession = {} as ICompanySession;
+    companies: ICompanySession[] = [];
+    
+    loadCompanies(userId: number, companiaId?: number) {
+        this.loginService.getPermissionsCompanies(userId).subscribe({
+            next: (res) => {
+                if (res.code === 200) {
+                    this.selectedCompany = res.data?.find(
+                        (c) => c.companiaId === companiaId
+                    ) || (res.data ? res.data[0] : {});
+                    this.companies = res.data || [];
+                }
+            }
+        });
+    }
+    
+    changeCompany(company: ICompanySession) {
+        this.selectedCompany = company;
+        const session = this.authService.getSession() as AuthSession;
+        
+        const updatedSession: AuthSession = {
+            ...session,
+            companiaId: company.companiaId
+        };
+        
+        this.authService.setData(updatedSession);
+        location.reload();
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Dark Mode Toggle">
+    ```typescript
+    // src/app/layout/component/app.topbar.ts:174-176
+    toggleDarkMode() {
+        this.layoutService.layoutConfig.update((state) => ({
+            ...state, 
+            darkTheme: !state.darkTheme 
+        }));
+    }
+    ```
+    
+    ```html
+    <button (click)="toggleDarkMode()" 
+            class="w-10 h-10 flex items-center justify-center 
+                   rounded-xl hover:bg-slate-50">
+        <i [ngClass]="{
+            'pi-moon': layoutService.isDarkTheme(), 
+            'pi-sun': !layoutService.isDarkTheme()
+        }" class="pi text-lg"></i>
+    </button>
+    ```
+  </Tab>
+  
+  <Tab title="User Menu">
+    ```typescript
+    // src/app/layout/component/app.topbar.ts:184-188
+    getInitials(firstName?: string, lastName?: string): string {
+        const n = firstName?.trim().charAt(0).toUpperCase() || '';
+        const a = lastName?.trim().charAt(0).toUpperCase() || '';
+        return `${n}${a}`;
+    }
+    
+    logout() {
+        this.authService.logout();
+        window.location.href = '/login';
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Topbar Template Example
+
+```html
+<div class="flex items-center justify-between w-full">
+    <!-- Left: Mobile Menu Toggle + Company Selector -->
+    <div class="flex items-center gap-6">
+        <button class="lg:hidden p-2.5 hover:bg-slate-100 rounded-xl"
+                (click)="layoutService.onMenuToggle()">
+            <i class="pi pi-bars text-xl"></i>
+        </button>
+        
+        <div class="relative">
+            <button class="flex items-center gap-3 px-4 py-2 bg-white 
+                           border rounded-2xl" 
+                    pStyleClass="@next" 
+                    [hideOnOutsideClick]="true">
+                <div class="w-9 h-9 rounded-xl bg-blue-50 flex items-center">
+                    <i class="pi pi-building"></i>
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-xs uppercase">Organización</span>
+                    <span class="text-sm font-bold">
+                        {{ selectedCompany.compania || 'Seleccionar...' }}
+                    </span>
+                </div>
+            </button>
+            
+            <!-- Dropdown -->
+            <div class="hidden absolute top-full mt-3 w-80 bg-white 
+                        rounded-2xl shadow-2xl">
+                @for (company of companies; track company.companiaId) {
+                    <button (click)="changeCompany(company)" 
+                            class="w-full flex items-center justify-between 
+                                   px-4 py-3 hover:bg-blue-50 rounded-xl">
+                        <span>{{ company.compania }}</span>
+                        <i *ngIf="selectedCompany.companiaId === company.companiaId" 
+                           class="pi pi-check-circle text-blue-500"></i>
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right: Dark Mode + Notifications + User Menu -->
+    <div class="flex items-center gap-4">
+        <!-- Dark mode & notifications -->
+        <div class="flex items-center gap-1">
+            <button (click)="toggleDarkMode()">
+                <i [ngClass]="{'pi-moon': layoutService.isDarkTheme(), 
+                               'pi-sun': !layoutService.isDarkTheme()}" 
+                   class="pi"></i>
+            </button>
+            <button class="relative">
+                <i class="pi pi-bell"></i>
+                <span class="absolute top-2 right-2 w-2 h-2 
+                             bg-red-500 rounded-full"></span>
+            </button>
+        </div>
+        
+        <!-- User dropdown -->
+        <div class="flex items-center gap-3">
+            <div class="flex flex-col">
+                <span class="text-xs font-black">
+                    {{ userSession?.firstName }} {{ userSession?.lastName }}
+                </span>
+                <span class="text-xs text-blue-500">
+                    {{ selectedCompany.rol }}
+                </span>
+            </div>
+            <div class="w-11 h-11 rounded-2xl bg-slate-900 
+                        flex items-center justify-center">
+                {{ getInitials(userSession?.firstName, userSession?.lastName) }}
+            </div>
+        </div>
+    </div>
+</div>
+```
+
+## Sidebar & Menu Component
+
+The sidebar contains the dynamic navigation menu based on user permissions.
+
+### Permission-Based Menu
+
+```typescript
+// src/app/layout/component/app.menu.ts:22-50
+export class AppMenu implements OnInit {
+    model: MenuItem[] = [];
+    
+    MODULE_MAP: Record<string, string> = {
+        POS: 'Punto de Venta',
+        PURCHASES: 'Compras',
+        INVENTORY: 'Inventario',
+        LOW_STOCK: 'Stock Bajo',
+        SUPPLIERS: 'Proveedores',
+        // ...
+    };
+    
+    ngOnInit() {
+        const session = this.authService.getSession();
+        const userId = session ? session.userId : 0;
+        const companiaId = session ? session.companiaId : 0;
+        
+        this.loginService.getPermissions(userId, companiaId).subscribe({
+            next: (permissions) => {
+                this.buildMenu(permissions.data || []);
+            }
+        });
+    }
+}
+```
+
+### Dynamic Menu Builder
+
+```typescript
+// src/app/layout/component/app.menu.ts:104-107
+private canView(moduleName: string, permissions: Permission[]): boolean {
+    return permissions.some(
+        (p) => this.normalize(p.module) === this.normalize(moduleName) && 
+               p.canView
+    );
+}
+
+private buildMenu(permissions: Permission[]) {
+    this.model = [
+        {
+            label: 'Menú',
+            items: [
+                this.canView('Punto de Venta', permissions) && {
+                    label: 'Punto de Venta',
+                    icon: 'pi pi-shopping-cart',
+                    routerLink: ['/pages/pos']
+                },
+                this.canView('Inventario', permissions) && {
+                    label: 'Inventario',
+                    icon: 'pi pi-box',
+                    routerLink: ['/pages/inventory']
+                },
+                // More items...
+            ].filter(Boolean) as MenuItem[]
+        },
+        {
+            label: 'Maestros',
+            items: [
+                this.canView('Clientes', permissions) && {
+                    label: 'Clientes',
+                    icon: 'pi pi-users',
+                    routerLink: ['/pages/customers']
+                },
+                // More items...
+            ].filter(Boolean) as MenuItem[]
+        }
+    ].filter((group) => group.items.length > 0);
+}
+```
+
+<Tip>
+Menu items are filtered using `.filter(Boolean)` to remove falsy values when permissions deny access.
+</Tip>
+
+## Layout Service
+
+The `LayoutService` manages layout state using Angular signals.
+
+### Layout Configuration Interface
+
+```typescript
+// src/app/layout/service/layout.service.ts:4-10
+export interface layoutConfig {
+    preset?: string;
+    primary?: string;
+    surface?: string | undefined | null;
+    darkTheme?: boolean;
+    menuMode?: string;
+}
+
+interface LayoutState {
+    staticMenuDesktopInactive?: boolean;
+    overlayMenuActive?: boolean;
+    configSidebarVisible?: boolean;
+    staticMenuMobileActive?: boolean;
+    menuHoverActive?: boolean;
+}
+```
+
+### Service Implementation
+
+```typescript
+// src/app/layout/service/layout.service.ts:28-77
+@Injectable({ providedIn: 'root' })
+export class LayoutService {
+    _config: layoutConfig = {
+        preset: 'Aura',
+        primary: 'emerald',
+        surface: null,
+        darkTheme: false,
+        menuMode: 'static'
+    };
+    
+    layoutConfig = signal<layoutConfig>(this._config);
+    layoutState = signal<LayoutState>(this._state);
+    
+    // Observables for events
+    private configUpdate = new Subject<layoutConfig>();
+    private overlayOpen = new Subject<any>();
+    private menuSource = new Subject<MenuChangeEvent>();
+    
+    // Computed properties
+    theme = computed(() => 
+        this.layoutConfig()?.darkTheme ? 'light' : 'dark'
+    );
+    
+    isSidebarActive = computed(() => 
+        this.layoutState().overlayMenuActive || 
+        this.layoutState().staticMenuMobileActive
+    );
+    
+    isDarkTheme = computed(() => this.layoutConfig().darkTheme);
+    
+    isOverlay = computed(() => this.layoutConfig().menuMode === 'overlay');
+}
+```
+
+### Menu Toggle Logic
+
+```typescript
+// src/app/layout/service/layout.service.ts:138-156
+onMenuToggle() {
+    if (this.isOverlay()) {
+        this.layoutState.update((prev) => ({
+            ...prev, 
+            overlayMenuActive: !this.layoutState().overlayMenuActive
+        }));
+        
+        if (this.layoutState().overlayMenuActive) {
+            this.overlayOpen.next(null);
+        }
+    }
+    
+    if (this.isDesktop()) {
+        this.layoutState.update((prev) => ({
+            ...prev, 
+            staticMenuDesktopInactive: !this.layoutState().staticMenuDesktopInactive
+        }));
+    } else {
+        this.layoutState.update((prev) => ({
+            ...prev, 
+            staticMenuMobileActive: !this.layoutState().staticMenuMobileActive
+        }));
+    }
+}
+
+isDesktop() {
+    return window.innerWidth > 991;
+}
+```
+
+## Dark Mode Implementation
+
+### View Transition API
+
+```typescript
+// src/app/layout/service/layout.service.ts:101-120
+private handleDarkModeTransition(config: layoutConfig): void {
+    if ((document as any).startViewTransition) {
+        this.startViewTransition(config);
+    } else {
+        this.toggleDarkMode(config);
+        this.onTransitionEnd();
+    }
+}
+
+private startViewTransition(config: layoutConfig): void {
+    const transition = (document as any).startViewTransition(() => {
+        this.toggleDarkMode(config);
+    });
+    
+    transition.ready
+        .then(() => this.onTransitionEnd())
+        .catch(() => {});
+}
+
+toggleDarkMode(config?: layoutConfig): void {
+    const _config = config || this.layoutConfig();
+    if (_config.darkTheme) {
+        document.documentElement.classList.add('app-dark');
+    } else {
+        document.documentElement.classList.remove('app-dark');
+    }
+}
+```
+
+<Note>
+The service uses the **View Transition API** when available for smooth theme transitions.
+</Note>
+
+## Responsive Design
+
+The layout adapts to different screen sizes:
+
+- **Desktop (> 991px)**: Fixed sidebar, full navigation
+- **Mobile (≤ 991px)**: Overlay sidebar, hamburger menu
+
+```typescript
+isDesktop() {
+    return window.innerWidth > 991;
+}
+
+isMobile() {
+    return !this.isDesktop();
+}
+```
+
+## Custom Scrollbar Styling
+
+```css
+.custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Form Components" icon="list-check" href="/components/forms">
+    Learn about form patterns and validation
+  </Card>
+  <Card title="Services" icon="code" href="/components/services">
+    Explore shared services and utilities
+  </Card>
+</CardGroup>

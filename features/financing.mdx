@@ -1,0 +1,382 @@
+---
+title: 'Customer Financing'
+description: 'Manage customer financing plans, track payments, and generate financial documents'
+icon: 'credit-card'
+---
+
+# Customer Financing
+
+The financing module enables you to manage customer payment plans, track installment payments, and generate professional financial documentation. This feature is essential for businesses that offer credit to their customers.
+
+## Business Value
+
+<CardGroup cols={2}>
+  <Card title="Flexible Payment Options" icon="coins">
+    Offer customers the ability to pay over time, increasing sales opportunities
+  </Card>
+  <Card title="Payment Tracking" icon="chart-line">
+    Monitor payment history and outstanding balances in real-time
+  </Card>
+  <Card title="Automated Documentation" icon="file-pdf">
+    Generate professional receipts and clearance certificates automatically
+  </Card>
+  <Card title="Permission Controls" icon="shield">
+    Role-based access control for viewing, creating, editing, and exporting financing data
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Payment Management
+
+The system tracks financing agreements and their associated payments:
+
+```typescript
+interface Financing {
+  id: number;
+  customerName: string;
+  invoiceNumber: string;
+  totalFinanced: number;
+  currentBalance: number;
+  payments: FinancingPayment[];
+}
+
+interface FinancingPayment {
+  id: number;
+  paymentAmount: number;
+  paymentMethod: 'cash' | 'card' | 'transfer' | 'financed' | 'other';
+  paymentDate: string;
+  remainingBalance: number;
+  receiptNumber: string;
+  notes?: string;
+}
+```
+
+### Supported Payment Methods
+
+The system supports five payment methods:
+
+<Tabs>
+  <Tab title="Cash">
+    💵 Direct cash payments
+  </Tab>
+  <Tab title="Card">
+    💳 Credit/debit card transactions
+  </Tab>
+  <Tab title="Transfer">
+    🏦 Bank transfers
+  </Tab>
+  <Tab title="Financed">
+    📅 Additional financing options
+  </Tab>
+  <Tab title="Other">
+    📝 Custom payment methods
+  </Tab>
+</Tabs>
+
+## Implementation Guide
+
+<Steps>
+  <Step title="Enable Financing Permissions">
+    Configure user permissions for the "Financiaciones" module:
+    
+    ```typescript
+    const permissions = {
+      module: 'Financiaciones',
+      canView: true,
+      canCreate: true,
+      canEdit: true,
+      canDelete: true,
+      canExport: true
+    };
+    ```
+  </Step>
+
+  <Step title="Load Financing Data">
+    Retrieve all financing agreements for display:
+    
+    ```typescript
+    loadFinancings(showMessage = false, number: number = 0) {
+      this.posService.getFinancings().subscribe({
+        next: (res) => {
+          this.financings = res.data || [];
+          this.filteredFinancings = [...this.financings];
+        },
+        error: () => {
+          // Handle error
+        }
+      });
+    }
+    ```
+  </Step>
+
+  <Step title="Register a Payment">
+    Add a new payment to an existing financing agreement:
+    
+    ```typescript
+    savePayment() {
+      // Validate payment amount
+      const remainingBalance = this.selectedFinancing?.currentBalance || 0;
+      if (this.newPayment.amount > remainingBalance) {
+        // Show error: payment exceeds balance
+        return;
+      }
+
+      const payload = {
+        id: this.selectedFinancing.id,
+        paymentAmount: this.newPayment.amount,
+        paymentMethod: this.newPayment.method,
+        notes: this.newPayment.notes,
+        registeredByUser: 1
+      };
+
+      this.posService.addFinancingPayment(payload).subscribe({
+        next: (res) => {
+          // Payment registered successfully
+          this.loadFinancings(false, 1);
+        }
+      });
+    }
+    ```
+  </Step>
+
+  <Step title="Generate Documents">
+    Create PDF receipts and clearance certificates:
+    
+    ```typescript
+    // Import pdfMake
+    import * as pdfMakeModule from 'pdfmake/build/pdfmake';
+    import * as pdfFontsModule from 'pdfmake/build/vfs_fonts';
+    
+    const pdfMake: any = (pdfMakeModule as any).default || pdfMakeModule;
+    const pdfFonts: any = (pdfFontsModule as any).default || pdfFontsModule;
+    pdfMake.vfs = pdfFonts.pdfMake?.vfs || pdfFonts.vfs;
+    ```
+  </Step>
+</Steps>
+
+## Document Generation
+
+### Payment Receipt
+
+Generate professional payment receipts with full payment history:
+
+```typescript
+generateReceipt(payment: any) {
+  const docDefinition = {
+    pageSize: 'A4',
+    pageMargins: [40, 50, 40, 50],
+    content: [
+      // Header
+      { text: 'MI TIENDA POS', style: 'title' },
+      { text: 'Comprobante de Financiación', style: 'subtitle' },
+      
+      // Customer info
+      {
+        table: {
+          body: [
+            ['Cliente:', this.selectedFinancing.customerName],
+            ['Factura:', this.selectedFinancing.invoiceNumber],
+            ['Método de Pago:', this.getPaymentLabel(payment.paymentMethod)]
+          ]
+        }
+      },
+      
+      // Payment history table
+      {
+        table: {
+          headerRows: 1,
+          body: [
+            ['Fecha', 'Recibo', 'Método', 'Valor Pagado', 'Saldo Restante'],
+            ...this.financingPayments.map(p => [
+              new Date(p.paymentDate).toLocaleDateString('es-CO'),
+              p.receiptNumber,
+              this.getPaymentLabel(p.paymentMethod),
+              this.formatCurrency(p.paymentAmount),
+              this.formatCurrency(p.remainingBalance)
+            ])
+          ]
+        }
+      }
+    ]
+  };
+  
+  pdfMake.createPdf(docDefinition).open();
+}
+```
+
+### Clearance Certificate (Paz y Salvo)
+
+Generate official clearance certificates when financing is fully paid:
+
+```typescript
+generateClearance() {
+  const docDefinition = {
+    pageSize: 'A4',
+    content: [
+      { text: 'MI TIENDA POS', style: 'headerTitle' },
+      { text: 'Certificado de Paz y Salvo', style: 'headerSubtitle' },
+      {
+        text: [
+          'Por medio del presente documento se certifica que el cliente ',
+          { text: this.selectedFinancing.customerName, bold: true },
+          ' ha cancelado en su totalidad las obligaciones económicas...'
+        ]
+      },
+      {
+        table: {
+          body: [
+            ['Saldo Actual', this.formatCurrency(0)],
+            ['Estado de la Financiación', 'Cancelada ✅']
+          ]
+        }
+      }
+    ]
+  };
+  
+  pdfMake.createPdf(docDefinition).open();
+}
+```
+
+## Filtering and Search
+
+Filter financing records by customer name or invoice number:
+
+```typescript
+applyFilters() {
+  const c = this.filters.customer.toLowerCase().trim();
+  const i = this.filters.invoice.toLowerCase().trim();
+  
+  this.filteredFinancings = this.financings.filter(f => 
+    (!c || f.customerName.toLowerCase().includes(c)) && 
+    (!i || f.invoiceNumber.toLowerCase().includes(i))
+  );
+}
+
+resetFilters() {
+  this.filters = { customer: '', invoice: '' };
+  this.filteredFinancings = [...this.financings];
+}
+```
+
+## Currency Formatting
+
+The system uses Colombian Peso (COP) formatting:
+
+```typescript
+formatCurrency(value: number): string {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0
+  }).format(value);
+}
+```
+
+## UI Components
+
+### Required PrimeNG Modules
+
+```typescript
+imports: [
+  CommonModule,
+  FormsModule,
+  TableModule,        // Data table
+  DialogModule,       // Modal dialogs
+  ButtonModule,       // Action buttons
+  InputNumberModule,  // Numeric input
+  DropdownModule,     // Payment method selector
+  ToastModule,        // Notifications
+  BadgeModule,        // Status indicators
+  OverlayBadgeModule  // Badge overlays
+]
+```
+
+## Service Integration
+
+The financing component integrates with the POS service:
+
+```typescript
+constructor(
+  private posService: PosService,
+  private messageService: MessageService,
+  private authService: AuthService,
+  private loginService: LoginService
+) {}
+```
+
+### Key Service Methods
+
+- `getFinancings()` - Retrieve all financing agreements
+- `getFinancingPayments(id)` - Get payment history for a financing
+- `addFinancingPayment(payload)` - Register a new payment
+
+## Validation Rules
+
+<Note>
+  **Payment Validation**: The system automatically validates that:
+  - Payment amount is greater than zero
+  - Payment does not exceed remaining balance
+  - Payment method is selected
+</Note>
+
+```typescript
+if (!this.newPayment.amount || this.newPayment.amount <= 0) {
+  this.messageService.add({
+    severity: 'warn',
+    summary: 'Campo requerido',
+    detail: 'Debes ingresar un valor de abono válido.'
+  });
+  return;
+}
+
+const remainingBalance = this.selectedFinancing?.currentBalance || 0;
+if (this.newPayment.amount > remainingBalance) {
+  this.messageService.add({
+    severity: 'error',
+    summary: 'Monto inválido',
+    detail: `El valor ingresado supera el saldo pendiente.`
+  });
+  return;
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Permission Management">
+    Always check user permissions before allowing financing operations:
+    
+    ```typescript
+    private applyPermissions(): void {
+      const moduleName = 'Financiaciones';
+      const permission = this.permissions.find(p => p.module === moduleName);
+      
+      if (!permission) {
+        this.resetPermissions();
+        return;
+      }
+      
+      this.canView = permission.canView;
+      this.canCreate = permission.canCreate;
+      this.canEdit = permission.canEdit;
+      this.canDelete = permission.canDelete;
+      this.canExport = permission.canExport;
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Real-time Balance Updates">
+    Update financing balances immediately after payment registration to maintain data consistency.
+  </Accordion>
+  
+  <Accordion title="Audit Trail">
+    Maintain complete payment history with receipt numbers, timestamps, and user information for financial auditing.
+  </Accordion>
+</AccordionGroup>
+
+## Reference
+
+- Component: `~/workspace/source/src/app/components/pages/financing/financing.component.ts`
+- Lines: 1-524
+- Dependencies: PrimeNG, pdfMake, PosService, AuthService

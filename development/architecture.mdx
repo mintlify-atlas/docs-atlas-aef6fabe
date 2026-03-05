@@ -1,0 +1,405 @@
+---
+title: Application Architecture
+description: Understanding the Angular 19 application structure and architectural patterns
+---
+
+## Project Structure
+
+The application follows Angular's recommended structure with standalone components:
+
+```
+src/
+├── app/
+│   ├── components/
+│   │   ├── auth/              # Authentication components
+│   │   ├── pages/             # Feature modules
+│   │   ├── services/          # Shared services
+│   │   ├── empty/             # Empty state component
+│   │   └── notfound/          # 404 component
+│   └── layout/
+│       ├── component/         # Layout components
+│       └── service/           # Layout services
+├── assets/
+│   ├── demo/                  # Demo data and flags
+│   └── layout/               # Layout styles and images
+│       ├── images/
+│       └── variables/
+├── styles.scss               # Global styles
+├── tailwind.css             # Tailwind imports
+└── main.ts                  # Application entry point
+```
+
+## Architecture Pattern
+
+### Standalone Components
+
+The application uses Angular 19's **standalone components** architecture, eliminating the need for NgModules:
+
+```typescript
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+
+// PrimeNG Imports
+import { ButtonModule } from 'primeng/button';
+import { TableModule } from 'primeng/table';
+
+@Component({
+    selector: 'app-agents',
+    standalone: true,
+    imports: [
+        CommonModule, 
+        FormsModule, 
+        TableModule, 
+        ButtonModule
+    ],
+    templateUrl: './agents.component.html',
+    styleUrl: './agents.component.scss'
+})
+export class AgentsComponent implements OnInit {
+    // Component logic
+}
+```
+
+### Key Benefits
+
+- **Simplified Module Management**: No need for NgModules
+- **Better Tree-Shaking**: Unused imports are automatically removed
+- **Improved Performance**: Lazy loading at component level
+- **Enhanced Developer Experience**: Clearer dependencies
+
+## Core Directories
+
+### `/app/components/auth/`
+
+Authentication and authorization components:
+
+- `login.ts` - User login
+- `access.ts` - Access denied page
+- `error.ts` - Error page
+- `auth.routes.ts` - Auth routing configuration
+
+**Location**: `src/app/components/auth/`
+
+### `/app/components/pages/`
+
+Feature modules organized by business domain:
+
+```
+pages/
+├── agents/              # WhatsApp agent management
+├── cash/                # Cash operations
+├── cash-register/       # Register management
+├── financing/           # Financing module
+├── inventory/           # Inventory management
+├── invoices/            # Invoice processing
+├── low-stock/           # Low stock alerts
+├── pos-folder/          # Point of Sale
+│   ├── cart-item/
+│   ├── customer-selector/
+│   ├── invoice-dialog/
+│   ├── payment-dialog/
+│   ├── pos/
+│   ├── product-card/
+│   ├── product-grid/
+│   ├── search-dialog/
+│   └── shopping-cart/
+├── promotions/          # Promotions management
+├── purchases/           # Purchase orders
+├── quotes/              # Quote generation
+├── reports/             # Reporting
+├── whatsapp-multiagent/ # WhatsApp integration
+├── master/              # Master data
+│   ├── categorys/
+│   ├── company/
+│   ├── customers/
+│   ├── initial-setup/
+│   ├── permissions/
+│   ├── settings/
+│   ├── suppliers/
+│   └── warehouses/
+├── api/                 # API interfaces
+└── core/                # Core utilities
+    └── guards/
+```
+
+**Location**: `src/app/components/pages/`
+
+### `/app/layout/`
+
+Application shell and layout components:
+
+**Components** (`src/app/layout/component/`):
+- `app.layout.ts` - Main layout wrapper
+- `app.topbar.ts` - Top navigation bar
+- `app.sidebar.ts` - Sidebar navigation
+- `app.footer.ts` - Footer component
+
+**Services** (`src/app/layout/service/`):
+- `layout.service.ts` - Layout state management
+
+### `/app/components/services/`
+
+Shared application services:
+
+- `master.service.ts` - Master data operations
+- `whatsapp.service.ts` - WhatsApp integration
+- `login.service.ts` - Authentication
+- Additional domain services
+
+**Location**: `src/app/components/services/`
+
+## Component Structure
+
+### Standard Component Pattern
+
+Each feature component follows this structure:
+
+<CodeGroup>
+```typescript component.ts
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+
+// Services
+import { MasterService } from '../../services/master.service';
+import { AuthService } from '../core/guards/auth.service';
+
+// Interfaces
+import { Permission, User } from '../api/permissions';
+
+@Component({
+    selector: 'app-example',
+    standalone: true,
+    imports: [CommonModule],
+    templateUrl: './example.component.html',
+    styleUrl: './example.component.scss'
+})
+export class ExampleComponent implements OnInit {
+    // State
+    isLoading: boolean = false;
+    
+    // Data
+    users: User[] = [];
+    
+    // Permissions
+    canView = false;
+    canCreate = false;
+    canEdit = false;
+    canDelete = false;
+    
+    constructor(
+        private masterService: MasterService,
+        private authService: AuthService
+    ) {}
+    
+    ngOnInit(): void {
+        this.loadData();
+    }
+    
+    private loadData(): void {
+        // Component logic
+    }
+}
+```
+
+```html component.html
+<div class="card">
+    <h2>Component Title</h2>
+    
+    <p-table [value]="users" [loading]="isLoading">
+        <!-- Table content -->
+    </p-table>
+</div>
+```
+
+```scss component.scss
+:host {
+    display: block;
+}
+
+.card {
+    @apply bg-white rounded-lg shadow-sm p-6;
+}
+```
+</CodeGroup>
+
+## Service Layer
+
+### Service Pattern
+
+Services use dependency injection and RxJS observables:
+
+```typescript
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+@Injectable({
+    providedIn: 'root'
+})
+export class MasterService {
+    private apiUrl = 'https://api.example.com';
+    
+    constructor(private http: HttpClient) {}
+    
+    getUsers(companiaId: number): Observable<any> {
+        return this.http.get(`${this.apiUrl}/users/${companiaId}`);
+    }
+    
+    createUser(user: User): Observable<any> {
+        return this.http.post(`${this.apiUrl}/users`, user);
+    }
+}
+```
+
+### Service Injection
+
+Services are provided at root level for singleton behavior:
+
+```typescript
+@Injectable({
+    providedIn: 'root'  // Single instance across app
+})
+```
+
+## State Management
+
+### Component-Level State
+
+State is managed at the component level using reactive patterns:
+
+```typescript
+export class ExampleComponent implements OnInit {
+    // UI State
+    isLoading: boolean = false;
+    isModalVisible: boolean = false;
+    selectedItem: Item | null = null;
+    
+    // Data State
+    items: Item[] = [];
+    filteredItems: Item[] = [];
+    
+    // Form State
+    formData = {
+        name: '',
+        email: '',
+        role: null as string | null
+    };
+}
+```
+
+### Permission-Based UI
+
+Components implement role-based access control:
+
+```typescript
+private applyPermissions(): void {
+    const moduleName = 'Agentes';
+    const permission = this.permissions.find(p => p.module === moduleName);
+    
+    if (!permission) {
+        this.resetPermissions();
+        return;
+    }
+    
+    this.canView = permission.canView;
+    this.canCreate = permission.canCreate;
+    this.canEdit = permission.canEdit;
+    this.canDelete = permission.canDelete;
+    this.canExport = permission.canExport;
+}
+```
+
+## Layout System
+
+The application uses a fixed layout with sidebar navigation:
+
+### Layout Structure
+
+```typescript
+@Component({
+    selector: 'app-layout',
+    template: `
+        <div class="fixed inset-0 w-screen h-screen bg-[#F8FAFC] flex overflow-hidden">
+            <!-- Sidebar -->
+            <aside class="w-80 h-full bg-[#F8FAFC] border-r">
+                <app-sidebar></app-sidebar>
+            </aside>
+            
+            <!-- Main Content -->
+            <div class="flex-1 flex flex-col">
+                <header class="h-20 flex-none">
+                    <app-topbar></app-topbar>
+                </header>
+                
+                <main class="flex-1 overflow-y-auto">
+                    <router-outlet></router-outlet>
+                </main>
+                
+                <footer class="py-10">
+                    <app-footer></app-footer>
+                </footer>
+            </div>
+        </div>
+    `
+})
+export class AppLayout {}
+```
+
+**Location**: `src/app/layout/component/app.layout.ts:1`
+
+### Dark Mode Support
+
+The layout includes built-in dark mode theming:
+
+```scss
+.dark-layout {
+    background-color: #0f172a !important;
+    color: #f1f5f9 !important;
+}
+
+.dark-layout .side-container,
+.dark-layout .main-content {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+}
+```
+
+## Dependency Injection
+
+Angular's DI system is used throughout:
+
+```typescript
+constructor(
+    private masterService: MasterService,
+    private messageService: MessageService,
+    private whatsappService: WhatsappService,
+    private authService: AuthService,
+    private loginService: LoginService
+) {}
+```
+
+## Best Practices
+
+<Tip>
+**Component Organization**
+- Keep components focused on a single responsibility
+- Use services for business logic and data access
+- Implement proper error handling and loading states
+- Apply permission checks for role-based access
+</Tip>
+
+<Warning>
+**Common Pitfalls**
+- Don't forget to unsubscribe from observables
+- Avoid logic in templates - move to component class
+- Don't manipulate DOM directly - use Angular directives
+- Keep component selector prefix consistent (`app-`)
+</Warning>
+
+## Next Steps
+
+- Learn about [Routing Configuration](/development/routing)
+- Understand [Styling System](/development/styling)
+- Review [Code Standards](/development/code-standards)
+- Set up [Testing](/development/testing)

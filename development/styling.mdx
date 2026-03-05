@@ -1,0 +1,523 @@
+---
+title: Styling Guide
+description: Using Tailwind CSS, SCSS, and PrimeNG theming in the POS application
+---
+
+## Overview
+
+The application uses a hybrid styling approach combining:
+
+- **Tailwind CSS** - Utility-first CSS framework
+- **SCSS** - Component-specific styles
+- **PrimeNG Themes** - UI component theming
+- **CSS Variables** - Dynamic theming support
+
+## Tailwind CSS Configuration
+
+The application uses Tailwind CSS v3.4.17 with the PrimeUI plugin.
+
+### Configuration File
+
+**Location**: `tailwind.config.js`
+
+<CodeGroup>
+```javascript tailwind.config.js
+import PrimeUI from 'tailwindcss-primeui';
+
+export default {
+    darkMode: ['selector', '[class="app-dark"]'],
+    content: [
+        './src/**/*.{html,ts,scss,css}',
+        './index.html'
+    ],
+    plugins: [PrimeUI],
+    theme: {
+        extend: {
+            colors: {
+                background: 'hsl(var(--background))',
+                foreground: 'hsl(var(--foreground))',
+                primary: {
+                    DEFAULT: 'hsl(var(--primary))',
+                    foreground: 'hsl(var(--primary-foreground))'
+                },
+                secondary: {
+                    DEFAULT: 'hsl(var(--secondary))',
+                    foreground: 'hsl(var(--secondary-foreground))'
+                },
+                // ... more colors
+            },
+            borderRadius: {
+                lg: 'var(--radius)',
+                md: 'calc(var(--radius) - 2px)',
+                sm: 'calc(var(--radius) - 4px)'
+            }
+        }
+    }
+};
+```
+</CodeGroup>
+
+### Key Features
+
+- **Dark Mode**: Supports selector-based dark mode switching
+- **Content Paths**: Scans all HTML, TypeScript, and SCSS files
+- **PrimeUI Plugin**: Integrates Tailwind with PrimeNG components
+- **Custom Colors**: HSL-based color system using CSS variables
+
+## Global Styles
+
+Global styles are defined in `src/styles.scss`:
+
+<CodeGroup>
+```scss styles.scss
+/* Import order is important */
+@use './tailwind.css';
+@use './assets/layout/layout.scss';
+@use 'primeicons/primeicons.css';
+@use './assets/demo/demo.scss';
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer utilities {
+    .text-balance {
+        text-wrap: balance;
+    }
+}
+
+@layer base {
+    :root {
+        --background: 0 0% 100%;
+        --foreground: 0 0% 3.9%;
+        --primary: 0 0% 9%;
+        --primary-foreground: 0 0% 98%;
+        --radius: 0.5rem;
+        /* ... more variables */
+    }
+    
+    .dark {
+        --background: 0 0% 3.9%;
+        --foreground: 0 0% 98%;
+        /* ... dark mode variables */
+    }
+}
+```
+</CodeGroup>
+
+**File Location**: `src/styles.scss`
+
+### Import Structure
+
+1. **Tailwind CSS** - Base utilities and components
+2. **Layout Styles** - Application layout SCSS
+3. **PrimeIcons** - Icon font
+4. **Demo Styles** - Additional demo components
+
+## CSS Variables
+
+The application uses HSL-based CSS variables for theming:
+
+### Light Theme
+
+```scss
+:root {
+    --background: 0 0% 100%;           /* White */
+    --foreground: 0 0% 3.9%;           /* Almost black */
+    --primary: 0 0% 9%;                 /* Dark gray */
+    --primary-foreground: 0 0% 98%;     /* Off white */
+    --secondary: 0 0% 96.1%;            /* Light gray */
+    --border: 0 0% 89.8%;               /* Border gray */
+    --radius: 0.5rem;                   /* Border radius */
+}
+```
+
+### Dark Theme
+
+```scss
+.dark {
+    --background: 0 0% 3.9%;            /* Dark background */
+    --foreground: 0 0% 98%;             /* Light text */
+    --primary: 0 0% 98%;                /* Light primary */
+    --primary-foreground: 0 0% 9%;      /* Dark text */
+    --secondary: 0 0% 14.9%;            /* Dark gray */
+    --border: 0 0% 14.9%;               /* Dark border */
+}
+```
+
+### Using CSS Variables
+
+Access variables through Tailwind classes:
+
+```html
+<div class="bg-background text-foreground">
+    <button class="bg-primary text-primary-foreground">
+        Click me
+    </button>
+</div>
+```
+
+## Tailwind Utility Classes
+
+### Common Patterns
+
+**Layout**:
+```html
+<!-- Flexbox -->
+<div class="flex items-center justify-between gap-4">
+    <span>Item 1</span>
+    <span>Item 2</span>
+</div>
+
+<!-- Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div class="card">Card 1</div>
+    <div class="card">Card 2</div>
+</div>
+
+<!-- Container -->
+<div class="max-w-[1600px] mx-auto px-6 lg:px-12">
+    Content
+</div>
+```
+
+**Spacing**:
+```html
+<!-- Padding and Margin -->
+<div class="p-6 lg:p-12">           <!-- Responsive padding -->
+<div class="mt-4 mb-8">             <!-- Margin top/bottom -->
+<div class="space-y-4">             <!-- Vertical spacing between children -->
+```
+
+**Typography**:
+```html
+<h1 class="text-2xl font-black tracking-tighter uppercase">
+    Heading
+</h1>
+<p class="text-base font-normal text-slate-600">
+    Paragraph
+</p>
+```
+
+**Colors**:
+```html
+<!-- Background -->
+<div class="bg-white dark:bg-slate-900">
+
+<!-- Text -->
+<p class="text-slate-900 dark:text-slate-100">
+
+<!-- Border -->
+<div class="border border-slate-200 dark:border-slate-700">
+```
+
+## Component Styles (SCSS)
+
+Each component can have its own SCSS file:
+
+### Component SCSS Pattern
+
+```scss
+// agents.component.scss
+:host {
+    display: block;
+}
+
+.card {
+    @apply bg-white rounded-lg shadow-sm p-6;
+    
+    &:hover {
+        @apply shadow-md;
+    }
+}
+
+.status-badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
+    
+    &.active {
+        @apply bg-green-100 text-green-800;
+    }
+    
+    &.inactive {
+        @apply bg-red-100 text-red-800;
+    }
+}
+
+// Custom scrollbar
+.custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+}
+```
+
+### Using @apply
+
+The `@apply` directive lets you use Tailwind classes in SCSS:
+
+```scss
+.button-primary {
+    @apply bg-blue-600 text-white px-4 py-2 rounded-lg;
+    @apply hover:bg-blue-700 transition-colors;
+    @apply focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+}
+```
+
+## Layout Styles
+
+Layout-specific styles are located in `src/assets/layout/`:
+
+```
+layout/
+├── _core.scss          # Core layout styles
+├── _footer.scss        # Footer styles
+├── _main.scss          # Main content area
+├── _menu.scss          # Sidebar menu
+├── _mixins.scss        # SCSS mixins
+├── _preloading.scss    # Loading states
+├── _responsive.scss    # Media queries
+├── _topbar.scss        # Top navigation
+├── _typography.scss    # Typography system
+├── _utils.scss         # Utility classes
+├── layout.scss         # Main import file
+└── variables/          # SCSS variables
+```
+
+### Custom Menu Styles
+
+**Location**: `src/assets/layout/_menu.scss`
+
+The menu uses custom styles for active states:
+
+```scss
+.layout-menuitem-root-text {
+    font-size: 0.85rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.25em !important;
+    font-weight: 900 !important;
+    color: #1e293b !important;
+}
+
+.layout-menu ul a {
+    margin: 0.4rem 1.25rem !important;
+    border-radius: 16px !important;
+    padding: 1.1rem 1.5rem !important;
+    transition: all 0.2s ease !important;
+}
+
+.active-route {
+    background-color: #ffffff !important;
+    color: #2563eb !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+}
+```
+
+## Dark Mode
+
+### Enabling Dark Mode
+
+The layout component controls dark mode:
+
+```typescript
+// app.layout.ts
+<div [class.dark-layout]="layoutService.isDarkTheme()">
+    <!-- Content -->
+</div>
+```
+
+### Dark Mode Styles
+
+```scss
+.dark-layout {
+    background-color: #0f172a !important;
+    color: #f1f5f9 !important;
+}
+
+.dark-layout .side-container,
+.dark-layout .main-content {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+.dark-layout .header-brand {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+}
+```
+
+### Responsive Dark Mode Classes
+
+```html
+<div class="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+    <p class="border-slate-200 dark:border-slate-700">
+        Content adapts to theme
+    </p>
+</div>
+```
+
+## PrimeNG Theming
+
+The application uses PrimeNG 19 with the new theming system:
+
+### PrimeNG Imports
+
+```typescript
+import { ButtonModule } from 'primeng/button';
+import { TableModule } from 'primeng/table';
+import { DialogModule } from 'primeng/dialog';
+import { DropdownModule } from 'primeng/dropdown';
+```
+
+### Styling PrimeNG Components
+
+Override PrimeNG styles using `:host ::ng-deep`:
+
+```scss
+:host ::ng-deep {
+    .p-button {
+        @apply rounded-lg font-semibold;
+    }
+    
+    .p-datatable {
+        .p-datatable-header {
+            @apply bg-slate-50 border-b border-slate-200;
+        }
+        
+        .p-datatable-tbody > tr:hover {
+            @apply bg-slate-50;
+        }
+    }
+}
+```
+
+## Responsive Design
+
+### Breakpoints
+
+Tailwind's default breakpoints:
+
+| Breakpoint | Min Width | Usage |
+|------------|-----------|-------|
+| `sm` | 640px | Small devices |
+| `md` | 768px | Tablets |
+| `lg` | 1024px | Laptops |
+| `xl` | 1280px | Desktops |
+| `2xl` | 1536px | Large screens |
+
+### Responsive Classes
+
+```html
+<!-- Stack on mobile, grid on larger screens -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div>Item 1</div>
+    <div>Item 2</div>
+    <div>Item 3</div>
+</div>
+
+<!-- Responsive padding -->
+<div class="p-4 md:p-6 lg:p-12">
+    Content
+</div>
+
+<!-- Show/hide based on screen size -->
+<div class="hidden lg:block">Desktop only</div>
+<div class="block lg:hidden">Mobile only</div>
+```
+
+## Animations
+
+Tailwind includes animation utilities:
+
+```html
+<!-- Transition -->
+<button class="transition-colors duration-300 hover:bg-blue-700">
+    Hover me
+</button>
+
+<!-- Custom animations -->
+<div class="animate-accordion-down">
+    Accordion content
+</div>
+```
+
+Define custom animations in `tailwind.config.js`:
+
+```javascript
+keyframes: {
+    'accordion-down': {
+        from: { height: '0' },
+        to: { height: 'var(--radix-accordion-content-height)' }
+    }
+},
+animation: {
+    'accordion-down': 'accordion-down 0.2s ease-out'
+}
+```
+
+## Best Practices
+
+<Tip>
+**Styling Guidelines**
+- Use Tailwind utilities for common patterns
+- Use SCSS for complex component-specific styles
+- Leverage CSS variables for theming
+- Keep styles scoped to components
+- Use `@apply` sparingly - prefer utility classes in templates
+</Tip>
+
+<Warning>
+**Common Mistakes**
+- Don't use inline styles - use Tailwind classes
+- Don't override PrimeNG styles globally - scope to components
+- Don't forget to test both light and dark modes
+- Avoid using `!important` unless absolutely necessary
+</Warning>
+
+## Style Organization
+
+### Component Style Structure
+
+```scss
+// 1. Host styles
+:host {
+    display: block;
+}
+
+// 2. Layout
+.container {
+    @apply max-w-7xl mx-auto px-4;
+}
+
+// 3. Components
+.card {
+    @apply bg-white rounded-lg shadow-sm p-6;
+}
+
+// 4. States
+.is-loading {
+    @apply opacity-50 pointer-events-none;
+}
+
+// 5. Responsive
+@media (max-width: 768px) {
+    .container {
+        padding: 1rem;
+    }
+}
+
+// 6. PrimeNG overrides
+:host ::ng-deep {
+    .p-component {
+        // Overrides
+    }
+}
+```
+
+## Next Steps
+
+- Review [Code Standards](/development/code-standards)
+- Learn about [Testing](/development/testing)
+- Understand [Application Architecture](/development/architecture)
